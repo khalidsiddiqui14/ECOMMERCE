@@ -78,7 +78,7 @@ Vendors can manage their store, products, orders, and vendor profile through a d
 - JWT Authentication
 
 ### Database
-
+- PostgreSQL for production
 - SQLite for development
 
 ## 📁 Project Structure
