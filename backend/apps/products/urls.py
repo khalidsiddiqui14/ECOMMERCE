@@ -10,11 +10,13 @@ router.register(
     basename="products",
 )
 
+
 products_router = routers.NestedSimpleRouter(
     router,
     "",
     lookup="product",
 )
+
 
 products_router.register(
     "images",
@@ -22,7 +24,8 @@ products_router.register(
     basename="product-images",
 )
 
+
 urlpatterns = (
-    router.urls +
-    products_router.urls
+    router.urls
+    + products_router.urls
 )

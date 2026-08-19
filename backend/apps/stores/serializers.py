@@ -33,6 +33,7 @@ class StoreSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    # Validate and normalize the store name
     def validate_name(self, value):
         value = value.strip()
 
@@ -42,3 +43,42 @@ class StoreSerializer(serializers.ModelSerializer):
             )
 
         return value
+
+    # Validate and normalize the store slug
+    def validate_slug(self, value):
+        value = value.strip().lower()
+
+        if len(value) < 3:
+            raise serializers.ValidationError(
+                "Store slug must contain at least 3 characters."
+            )
+
+        return value
+
+    # Normalize the store email
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    # Normalize the store phone number
+    def validate_phone(self, value):
+        return value.strip()
+
+    # Normalize the store address
+    def validate_address(self, value):
+        return value.strip()
+
+    # Normalize the store city
+    def validate_city(self, value):
+        return value.strip()
+
+    # Normalize the store state
+    def validate_state(self, value):
+        return value.strip()
+
+    # Normalize the store country
+    def validate_country(self, value):
+        return value.strip()
+
+    # Normalize the store postal code
+    def validate_postal_code(self, value):
+        return value.strip()

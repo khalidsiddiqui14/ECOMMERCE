@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.orders.models import Order
+
 from .models import Payment
 
 
@@ -30,3 +32,36 @@ class PaymentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def validate_order(self, value):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError(
+                "Authentication is required."
+            )
+
+        if value.user_id != request.user.id:
+            raise serializers.ValidationError(
+                "You can only make payment for your own order."
+            )
+
+        if value.status == "CANCELLED":
+            raise serializers.ValidationError(
+                "Payment cannot be created for a cancelled order."
+            )
+
+        return value
+
+    def validate_payment_method(self, value):
+        allowed_methods = {
+            choice[0]
+            for choice in Payment.METHOD_CHOICES
+        }
+
+        if value not in allowed_methods:
+            raise serializers.ValidationError(
+                "Invalid payment method."
+            )
+
+        return value

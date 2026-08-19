@@ -13,18 +13,21 @@ class Product(models.Model):
         ("OUT_OF_STOCK", "Out of Stock"),
     )
 
+    # Link product to its store
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
         related_name="products",
     )
 
+    # Link product to its category
     category = models.ForeignKey(
         Category,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="products",
     )
 
+    # Link product to an optional brand
     brand = models.ForeignKey(
         Brand,
         on_delete=models.SET_NULL,
@@ -33,22 +36,29 @@ class Product(models.Model):
         related_name="products",
     )
 
+    # Store the product name
     name = models.CharField(
         max_length=255,
         db_index=True,
     )
 
+    # Store the unique URL-friendly product identifier
     slug = models.SlugField(
+        max_length=255,
         unique=True,
     )
 
+    # Store the unique product SKU
     sku = models.CharField(
         max_length=100,
         unique=True,
+        db_index=True,
     )
 
+    # Store the product description
     description = models.TextField()
 
+    # Store the product price
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -57,10 +67,12 @@ class Product(models.Model):
         ],
     )
 
+    # Store the available product stock
     stock = models.PositiveIntegerField(
         default=0,
     )
 
+    # Track the product publication status
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -68,15 +80,18 @@ class Product(models.Model):
         db_index=True,
     )
 
+    # Track whether the product is active
     is_active = models.BooleanField(
         default=True,
         db_index=True,
     )
 
+    # Store the product creation timestamp
     created_at = models.DateTimeField(
         auto_now_add=True,
     )
 
+    # Store the product last update timestamp
     updated_at = models.DateTimeField(
         auto_now=True,
     )
@@ -91,21 +106,25 @@ class Product(models.Model):
 
 
 class ProductImage(models.Model):
+    # Link the image to a product
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name="images",
     )
 
+    # Store the product image
     image = models.ImageField(
         upload_to="products/%Y/%m/",
     )
 
+    # Mark the primary product image
     is_primary = models.BooleanField(
         default=False,
         db_index=True,
     )
 
+    # Store the image creation timestamp
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

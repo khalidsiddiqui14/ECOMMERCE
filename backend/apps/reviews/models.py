@@ -1,5 +1,8 @@
 from django.conf import settings
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import (
+    MaxValueValidator,
+    MinValueValidator,
+)
 from django.db import models
 
 from apps.products.models import Product
@@ -29,8 +32,14 @@ class Review(models.Model):
         blank=True,
     )
 
+    is_verified_purchase = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
     is_active = models.BooleanField(
         default=True,
+        db_index=True,
     )
 
     created_at = models.DateTimeField(
@@ -51,5 +60,19 @@ class Review(models.Model):
             ),
         ]
 
+        indexes = [
+            models.Index(
+                fields=[
+                    "product",
+                    "is_active",
+                    "-created_at",
+                ],
+                name="review_product_active_created",
+            ),
+        ]
+
     def __str__(self):
-        return f"{self.product.name} - {self.rating}/5"
+        return (
+            f"{self.product.name} - "
+            f"{self.rating}/5"
+        )

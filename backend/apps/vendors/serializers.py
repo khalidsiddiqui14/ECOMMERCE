@@ -4,6 +4,7 @@ from .models import Vendor
 
 
 class VendorSerializer(serializers.ModelSerializer):
+    # Keep the vendor user relationship read-only
     user = serializers.StringRelatedField(read_only=True)
 
     class Meta:
@@ -33,14 +34,21 @@ class VendorSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    # Validate and normalize the business name
     def validate_business_name(self, value):
-        if len(value.strip()) < 3:
+        value = value.strip()
+
+        if len(value) < 3:
             raise serializers.ValidationError(
                 "Business name must contain at least 3 characters."
             )
+
         return value
 
+    # Validate and normalize the vendor phone number
     def validate_phone(self, value):
+        value = value.strip()
+
         queryset = Vendor.objects.filter(phone=value)
 
         if self.instance:
@@ -53,9 +61,12 @@ class VendorSerializer(serializers.ModelSerializer):
 
         return value
 
+    # Validate and normalize the GST number
     def validate_gst_number(self, value):
         if not value:
             return value
+
+        value = value.strip().upper()
 
         queryset = Vendor.objects.filter(gst_number=value)
 

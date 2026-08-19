@@ -1,6 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
 from rest_framework import generics
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
@@ -9,11 +6,8 @@ from .serializers import BrandSerializer
 
 
 class IsAdminOrReadOnly(BasePermission):
-    """
-    Anyone can view brands.
-    Only ADMIN users can create, update, or delete brands.
-    """
 
+    # Allow everyone to view brands and only admins to modify them
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
@@ -25,7 +19,6 @@ class IsAdminOrReadOnly(BasePermission):
 
 
 class BrandListCreateView(generics.ListCreateAPIView):
-    queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     permission_classes = [IsAdminOrReadOnly]
 
@@ -47,8 +40,35 @@ class BrandListCreateView(generics.ListCreateAPIView):
         "name",
     ]
 
+    # Return active brands publicly and all brands to admins
+    def get_queryset(self):
+        queryset = Brand.objects.all()
+
+        if (
+            self.request.user.is_authenticated
+            and self.request.user.role == "ADMIN"
+        ):
+            return queryset
+
+        return queryset.filter(
+            is_active=True,
+        )
+
 
 class BrandDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    # Return active brands publicly and all brands to admins
+    def get_queryset(self):
+        queryset = Brand.objects.all()
+
+        if (
+            self.request.user.is_authenticated
+            and self.request.user.role == "ADMIN"
+        ):
+            return queryset
+
+        return queryset.filter(
+            is_active=True,
+        )

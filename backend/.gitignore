@@ -1,17 +1,40 @@
-venv/
-.venv/
-
-__pycache__/
-*.py[cod]
-
-*.sqlite3
-*.sqlite3-journal
-
+# Environment
 .env
 .env.*
-!.env.example
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Django
+*.log
+db.sqlite3
 media/
 staticfiles/
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
 .DS_Store
+
+# Local data
+local_data_backup.json
+
+# Docker
+docker-compose.override.yml

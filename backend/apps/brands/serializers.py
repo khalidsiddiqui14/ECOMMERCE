@@ -24,6 +24,7 @@ class BrandSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
+    # Validate and normalize the brand name
     def validate_name(self, value):
         value = value.strip()
 
@@ -33,3 +34,18 @@ class BrandSerializer(serializers.ModelSerializer):
             )
 
         return value
+
+    # Normalize the brand slug
+    def validate_slug(self, value):
+        value = value.strip().lower()
+
+        if len(value) < 2:
+            raise serializers.ValidationError(
+                "Brand slug must contain at least 2 characters."
+            )
+
+        return value
+
+    # Normalize the brand description
+    def validate_description(self, value):
+        return value.strip()

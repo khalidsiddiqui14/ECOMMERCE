@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 
 from django.db import transaction
@@ -22,6 +23,32 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
+    # Search
+    search_fields = [
+        "order_number",
+        "shipping_name",
+        "shipping_phone",
+        "shipping_city",
+    ]
+
+    # Filtering
+    filterset_fields = [
+        "status",
+        "payment_status",
+    ]
+
+    # Ordering
+    ordering_fields = [
+        "created_at",
+        "total_amount",
+        "status",
+        "payment_status",
+    ]
+
+    ordering = [
+        "-created_at",
+    ]
+
     http_method_names = [
         "get",
         "post",
@@ -30,27 +57,22 @@ class OrderViewSet(viewsets.ModelViewSet):
         "options",
     ]
 
-    # ==========================================
-    # Customer Orders
-    # ==========================================
-
     def get_queryset(self):
         return (
             Order.objects
-            .filter(user=self.request.user)
-            .prefetch_related("items")
+            .filter(
+                user=self.request.user,
+            )
+            .prefetch_related(
+                "items",
+            )
+            .order_by(
+                "-created_at",
+            )
         )
-
-    # ==========================================
-    # Generate Order Number
-    # ==========================================
 
     def generate_order_number(self):
         return f"ORD-{uuid.uuid4().hex[:12].upper()}"
-
-    # ==========================================
-    # Create Customer Order
-    # ==========================================
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -60,23 +82,27 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
 
         cart_items = list(
-            cart.items.select_related("product").all()
+            cart.items
+            .select_related(
+                "product",
+            )
+            .all()
         )
 
         if not cart_items:
             raise ValidationError(
-                "Your cart is empty."
+                {
+                    "cart": "Your cart is empty.",
+                }
             )
 
         serializer = self.get_serializer(
-            data=request.data
+            data=request.data,
         )
 
         serializer.is_valid(
-            raise_exception=True
+            raise_exception=True,
         )
-
-        subtotal = 0
 
         product_ids = [
             item.product_id
@@ -85,40 +111,59 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         locked_products = {
             product.id: product
-            for product in Product.objects
-            .select_for_update()
-            .filter(id__in=product_ids)
+            for product in (
+                Product.objects
+                .select_for_update()
+                .filter(
+                    id__in=product_ids,
+                )
+            )
         }
+
+        subtotal = Decimal("0.00")
 
         for cart_item in cart_items:
             product = locked_products.get(
-                cart_item.product_id
+                cart_item.product_id,
             )
 
             if not product:
                 raise ValidationError(
-                    f"Product for cart item "
-                    f"{cart_item.id} no longer exists."
+                    {
+                        "product": (
+                            f"Product for cart item "
+                            f"{cart_item.id} no longer exists."
+                        ),
+                    }
                 )
 
             if not product.is_active:
                 raise ValidationError(
-                    f"{product.name} is inactive."
+                    {
+                        "product": (
+                            f"{product.name} is inactive."
+                        ),
+                    }
                 )
 
             if product.status != "PUBLISHED":
                 raise ValidationError(
-                    f"{product.name} is not available."
+                    {
+                        "product": (
+                            f"{product.name} is not "
+                            "available for purchase."
+                        ),
+                    }
                 )
 
-            if cart_item.quantity > product.stock:
+            if product.stock < cart_item.quantity:
                 raise ValidationError(
                     {
                         "stock": (
                             f"Only {product.stock} "
-                            f"item(s) available for "
-                            f"{product.name}."
-                        )
+                            f"item(s) are available "
+                            f"for {product.name}."
+                        ),
                     }
                 )
 
@@ -126,7 +171,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 product.price * cart_item.quantity
             )
 
-        shipping_cost = 0
+        shipping_cost = Decimal("0.00")
 
         total_amount = (
             subtotal + shipping_cost
@@ -135,6 +180,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         order = Order.objects.create(
             user=request.user,
             order_number=self.generate_order_number(),
+            status="PENDING",
+            payment_status="PENDING",
             subtotal=subtotal,
             shipping_cost=shipping_cost,
             total_amount=total_amount,
@@ -189,23 +236,29 @@ class OrderViewSet(viewsets.ModelViewSet):
                     "stock",
                     "status",
                     "updated_at",
-                ]
+                ],
             )
 
         cart.items.all().delete()
 
+        order = (
+            Order.objects
+            .prefetch_related(
+                "items",
+            )
+            .get(
+                pk=order.pk,
+            )
+        )
+
         response_serializer = self.get_serializer(
-            order
+            order,
         )
 
         return Response(
             response_serializer.data,
             status=status.HTTP_201_CREATED,
         )
-
-    # ==========================================
-    # Vendor Dashboard
-    # ==========================================
 
     @action(
         detail=False,
@@ -222,7 +275,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         vendor_items = (
             OrderItem.objects
             .filter(
-                product__store__vendor__user=user
+                product__store__vendor__user=user,
             )
             .select_related(
                 "order",
@@ -233,14 +286,16 @@ class OrderViewSet(viewsets.ModelViewSet):
         total_products = (
             Product.objects
             .filter(
-                store__vendor__user=user
+                store__vendor__user=user,
             )
             .count()
         )
 
         total_orders = (
             vendor_items
-            .values("order_id")
+            .values(
+                "order_id",
+            )
             .distinct()
             .count()
         )
@@ -248,23 +303,29 @@ class OrderViewSet(viewsets.ModelViewSet):
         pending_orders = (
             vendor_items
             .filter(
-                order__status="PENDING"
+                order__status="PENDING",
             )
-            .values("order_id")
+            .values(
+                "order_id",
+            )
             .distinct()
             .count()
         )
 
         revenue = (
             vendor_items.aggregate(
-                total=Sum("total_price")
+                total=Sum(
+                    "total_price",
+                ),
             )["total"]
-            or 0
+            or Decimal("0.00")
         )
 
         recent_items = (
             vendor_items
-            .order_by("-order__created_at")[:10]
+            .order_by(
+                "-order__created_at",
+            )[:10]
         )
 
         recent_orders = {}
@@ -275,9 +336,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             if order.id not in recent_orders:
                 recent_orders[order.id] = {
                     "id": order.id,
-                    "order_number": (
-                        order.order_number
-                    ),
+                    "order_number": order.order_number,
                     "status": order.status,
                     "payment_status": (
                         order.payment_status
@@ -285,7 +344,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                     "created_at": (
                         order.created_at
                     ),
-                    "total_amount": "0.00",
+                    "total_amount": (
+                        Decimal("0.00")
+                    ),
                     "items": [],
                 }
 
@@ -298,27 +359,25 @@ class OrderViewSet(viewsets.ModelViewSet):
                         item.product_name
                     ),
                     "sku": item.sku,
-                    "price": str(item.price),
+                    "price": str(
+                        item.price,
+                    ),
                     "quantity": item.quantity,
                     "total_price": str(
-                        item.total_price
+                        item.total_price,
                     ),
                 }
             )
 
-            current_total = sum(
-                float(
-                    order_item["total_price"]
-                )
-                for order_item in recent_orders[
-                    order.id
-                ]["items"]
-            )
-
             recent_orders[
                 order.id
-            ]["total_amount"] = (
-                f"{current_total:.2f}"
+            ]["total_amount"] += (
+                item.total_price
+            )
+
+        for order_data in recent_orders.values():
+            order_data["total_amount"] = str(
+                order_data["total_amount"]
             )
 
         vendor = getattr(
@@ -327,10 +386,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             None,
         )
 
-        store = getattr(
-            vendor,
-            "store",
-            None,
+        store = (
+            getattr(
+                vendor,
+                "store",
+                None,
+            )
+            if vendor
+            else None
         )
 
         return Response(
@@ -343,20 +406,25 @@ class OrderViewSet(viewsets.ModelViewSet):
                     ),
                 },
                 "stats": {
-                    "total_products": total_products,
-                    "total_orders": total_orders,
-                    "pending_orders": pending_orders,
-                    "revenue": str(revenue),
+                    "total_products": (
+                        total_products
+                    ),
+                    "total_orders": (
+                        total_orders
+                    ),
+                    "pending_orders": (
+                        pending_orders
+                    ),
+                    "revenue": str(
+                        revenue
+                    ),
                 },
                 "recent_orders": list(
                     recent_orders.values()
                 ),
-            }
+            },
+            status=status.HTTP_200_OK,
         )
-
-    # ==========================================
-    # Vendor Orders List
-    # ==========================================
 
     @action(
         detail=False,
@@ -373,14 +441,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         vendor_items = (
             OrderItem.objects
             .filter(
-                product__store__vendor__user=user
+                product__store__vendor__user=user,
             )
             .select_related(
                 "order",
                 "product",
             )
             .order_by(
-                "-order__created_at"
+                "-order__created_at",
             )
         )
 
@@ -423,7 +491,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                     "date": (
                         order.created_at
                     ),
-                    "total": "0.00",
+                    "total": (
+                        Decimal("0.00")
+                    ),
                     "items": [],
                 }
 
@@ -440,35 +510,44 @@ class OrderViewSet(viewsets.ModelViewSet):
                     ),
                     "sku": item.sku,
                     "quantity": item.quantity,
-                    "price": str(item.price),
+                    "price": str(
+                        item.price,
+                    ),
                     "total": str(
-                        item.total_price
+                        item.total_price,
                     ),
                 }
             )
 
-            vendor_total = sum(
-                float(
-                    vendor_item["total"]
-                )
-                for vendor_item in orders[
-                    order.id
-                ]["items"]
-            )
-
             orders[
                 order.id
-            ]["total"] = (
-                f"{vendor_total:.2f}"
+            ]["total"] += (
+                item.total_price
+            )
+
+        for order_data in orders.values():
+            order_data["total"] = str(
+                order_data["total"]
+            )
+
+        orders = list(
+            orders.values()
+        )
+
+        # Pagination for vendor orders
+        page = self.paginate_queryset(
+            orders
+        )
+
+        if page is not None:
+            return self.get_paginated_response(
+                page
             )
 
         return Response(
-            list(orders.values())
+            orders,
+            status=status.HTTP_200_OK,
         )
-
-    # ==========================================
-    # Vendor Update Order Status
-    # ==========================================
 
     @action(
         detail=True,
@@ -480,39 +559,62 @@ class OrderViewSet(viewsets.ModelViewSet):
         ],
     )
     @transaction.atomic
-    def vendor_status(self, request, pk=None):
+    def vendor_status(
+        self,
+        request,
+        pk=None,
+    ):
         user = request.user
 
         order = get_object_or_404(
-            Order,
+            Order.objects.select_for_update(),
             id=pk,
         )
 
-        # Make sure this order contains
-        # at least one product belonging
-        # to the current vendor.
-        vendor_item_exists = (
+        vendor_items = (
             OrderItem.objects
             .filter(
                 order=order,
-                product__store__vendor__user=user,
             )
-            .exists()
+            .select_related(
+                "product__store__vendor",
+            )
         )
 
-        if not vendor_item_exists:
+        if not vendor_items.exists():
+            raise ValidationError(
+                {
+                    "order": (
+                        "Order does not contain any items."
+                    ),
+                }
+            )
+
+        vendor_item_count = (
+            vendor_items
+            .filter(
+                product__store__vendor__user=user,
+            )
+            .count()
+        )
+
+        total_item_count = vendor_items.count()
+
+        if (
+            vendor_item_count != total_item_count
+        ):
             return Response(
                 {
                     "detail": (
-                        "You do not have permission "
-                        "to update this order."
-                    )
+                        "You cannot update the status "
+                        "of a multi-vendor order."
+                    ),
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         new_status = request.data.get(
-            "status"
+            "status",
         )
 
         allowed_statuses = {
@@ -529,25 +631,54 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {
                     "status": (
                         "Invalid order status."
-                    )
+                    ),
                 }
             )
 
-        if (
-            order.status == "DELIVERED"
-            and new_status != "DELIVERED"
-        ):
+        current_status = order.status
+
+        if current_status == "DELIVERED":
             raise ValidationError(
                 "A delivered order cannot be changed."
             )
 
-        if (
-            order.status == "CANCELLED"
-            and new_status != "CANCELLED"
-        ):
+        if current_status == "CANCELLED":
             raise ValidationError(
                 "A cancelled order cannot be changed."
             )
+
+        allowed_transitions = {
+            "PENDING": {
+                "CONFIRMED",
+                "CANCELLED",
+            },
+            "CONFIRMED": {
+                "PROCESSING",
+                "CANCELLED",
+            },
+            "PROCESSING": {
+                "SHIPPED",
+                "CANCELLED",
+            },
+            "SHIPPED": {
+                "DELIVERED",
+            },
+        }
+
+        if new_status != current_status:
+            if new_status not in allowed_transitions.get(
+                current_status,
+                set(),
+            ):
+                raise ValidationError(
+                    {
+                        "status": (
+                            f"Cannot change order status "
+                            f"from {current_status} "
+                            f"to {new_status}."
+                        ),
+                    }
+                )
 
         order.status = new_status
 
@@ -555,7 +686,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             update_fields=[
                 "status",
                 "updated_at",
-            ]
+            ],
         )
 
         return Response(

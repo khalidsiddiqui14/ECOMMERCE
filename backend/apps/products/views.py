@@ -1,12 +1,18 @@
+from django.shortcuts import get_object_or_404
+
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import BasePermission, SAFE_METHODS
-from rest_framework.exceptions import PermissionDenied
+
+from apps.stores.models import Store
 
 from .models import Product, ProductImage
 from .serializers import ProductSerializer, ProductImageSerializer
 
 
 class IsAdminOrVendorOrReadOnly(BasePermission):
+
+    # Allow everyone to read and only admins or vendors to modify products
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
@@ -45,6 +51,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         "-created_at",
     ]
 
+    # Return products according to the user's role
     def get_queryset(self):
         queryset = (
             Product.objects
@@ -71,7 +78,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         if user.role == "VENDOR":
             return queryset.filter(
-                store__vendor__user=user
+                store__vendor__user=user,
             )
 
         return queryset.filter(
@@ -79,24 +86,74 @@ class ProductViewSet(viewsets.ModelViewSet):
             is_active=True,
         )
 
+    # Assign the product to the correct store during creation
     def perform_create(self, serializer):
         user = self.request.user
 
         if user.role == "ADMIN":
-            serializer.save()
+            store_id = self.request.data.get("store")
+
+            if not store_id:
+                raise ValidationError(
+                    "Store is required when an admin creates a product."
+                )
+
+            store = get_object_or_404(
+                Store,
+                pk=store_id,
+            )
+
+            if not store.is_active:
+                raise ValidationError(
+                    "Cannot create a product for an inactive store."
+                )
+
+            serializer.save(
+                store=store,
+            )
             return
 
-        vendor = user.vendor
+        if user.role != "VENDOR":
+            raise PermissionDenied(
+                "You do not have permission to create products."
+            )
+
+        vendor = getattr(
+            user,
+            "vendor",
+            None,
+        )
+
+        if not vendor:
+            raise PermissionDenied(
+                "Vendor profile does not exist."
+            )
+
+        store = getattr(
+            vendor,
+            "store",
+            None,
+        )
+
+        if not store:
+            raise PermissionDenied(
+                "Store does not exist for this vendor."
+            )
+
+        if not store.is_active:
+            raise PermissionDenied(
+                "Your store is inactive."
+            )
 
         serializer.save(
-            store=vendor.store
+            store=store,
         )
 
 
 class ProductImageViewSet(viewsets.ModelViewSet):
     serializer_class = ProductImageSerializer
     permission_classes = [
-        IsAdminOrVendorOrReadOnly
+        IsAdminOrVendorOrReadOnly,
     ]
 
     http_method_names = [
@@ -107,12 +164,21 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         "options",
     ]
 
+    # Return images according to the user's role
     def get_queryset(self):
         product_id = self.kwargs["product_pk"]
 
-        queryset = ProductImage.objects.filter(
-            product_id=product_id
-        ).select_related("product")
+        queryset = (
+            ProductImage.objects
+            .filter(
+                product_id=product_id,
+            )
+            .select_related(
+                "product",
+                "product__store",
+                "product__store__vendor",
+            )
+        )
 
         user = self.request.user
 
@@ -127,7 +193,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
 
         if user.role == "VENDOR":
             return queryset.filter(
-                product__store__vendor__user=user
+                product__store__vendor__user=user,
             )
 
         return queryset.filter(
@@ -135,24 +201,57 @@ class ProductImageViewSet(viewsets.ModelViewSet):
             product__is_active=True,
         )
 
+    # Attach the image to the selected product
     def perform_create(self, serializer):
-        product = Product.objects.get(
-            pk=self.kwargs["product_pk"]
+        product = get_object_or_404(
+            Product,
+            pk=self.kwargs["product_pk"],
         )
 
         user = self.request.user
 
         if user.role == "ADMIN":
-            serializer.save(product=product)
+            serializer.save(
+                product=product,
+            )
             return
 
         if user.role == "VENDOR":
-            if product.store.vendor.user != user:
+            vendor = getattr(
+                user,
+                "vendor",
+                None,
+            )
+
+            if not vendor:
+                raise PermissionDenied(
+                    "Vendor profile does not exist."
+                )
+
+            store = getattr(
+                vendor,
+                "store",
+                None,
+            )
+
+            if not store:
+                raise PermissionDenied(
+                    "Store does not exist for this vendor."
+                )
+
+            if product.store_id != store.id:
                 raise PermissionDenied(
                     "You can only upload images for your own products."
                 )
 
-            serializer.save(product=product)
+            if not store.is_active:
+                raise PermissionDenied(
+                    "Your store is inactive."
+                )
+
+            serializer.save(
+                product=product,
+            )
             return
 
         raise PermissionDenied(

@@ -49,6 +49,7 @@ class Address(models.Model):
 
     is_default = models.BooleanField(
         default=False,
+        db_index=True,
     )
 
     created_at = models.DateTimeField(
@@ -66,6 +67,14 @@ class Address(models.Model):
         ]
         verbose_name = "Address"
         verbose_name_plural = "Addresses"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_default=True),
+                name="unique_default_address_per_user",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.full_name} - {self.city}"

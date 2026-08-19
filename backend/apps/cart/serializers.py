@@ -4,11 +4,13 @@ from .models import Cart, CartItem
 
 
 class CartItemSerializer(serializers.ModelSerializer):
+    # Return the product name in the cart response
     product_name = serializers.CharField(
         source="product.name",
         read_only=True,
     )
 
+    # Return the current product price in the cart response
     price = serializers.DecimalField(
         source="product.price",
         max_digits=10,
@@ -16,6 +18,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    # Return the calculated item total
     total_price = serializers.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -40,6 +43,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             "total_price",
         )
 
+    # Validate cart item quantity
     def validate_quantity(self, value):
         if value < 1:
             raise serializers.ValidationError(
@@ -48,42 +52,79 @@ class CartItemSerializer(serializers.ModelSerializer):
 
         return value
 
+    # Validate product availability and stock
     def validate(self, attrs):
         product = attrs.get(
             "product",
-            getattr(self.instance, "product", None),
+            getattr(
+                self.instance,
+                "product",
+                None,
+            ),
         )
 
         quantity = attrs.get(
             "quantity",
-            getattr(self.instance, "quantity", 1),
+            getattr(
+                self.instance,
+                "quantity",
+                1,
+            ),
         )
 
-        if product:
-            if not product.is_active:
-                raise serializers.ValidationError(
-                    "This product is currently inactive."
-                )
+        if not product:
+            return attrs
 
-            if product.status != "PUBLISHED":
-                raise serializers.ValidationError(
-                    "This product is not available for purchase."
-                )
+        if not product.is_active:
+            raise serializers.ValidationError(
+                {
+                    "product": (
+                        "This product is currently inactive."
+                    )
+                }
+            )
 
-            if quantity > product.stock:
-                raise serializers.ValidationError(
-                    f"Only {product.stock} item(s) are available in stock."
-                )
+        if product.status != "PUBLISHED":
+            raise serializers.ValidationError(
+                {
+                    "product": (
+                        "This product is not available "
+                        "for purchase."
+                    )
+                }
+            )
+
+        if product.stock <= 0:
+            raise serializers.ValidationError(
+                {
+                    "product": (
+                        "This product is currently "
+                        "out of stock."
+                    )
+                }
+            )
+
+        if quantity > product.stock:
+            raise serializers.ValidationError(
+                {
+                    "quantity": (
+                        f"Only {product.stock} item(s) "
+                        "are available in stock."
+                    )
+                }
+            )
 
         return attrs
 
 
 class CartSerializer(serializers.ModelSerializer):
+    # Include all items belonging to the cart
     items = CartItemSerializer(
         many=True,
         read_only=True,
     )
 
+    # Return the calculated cart total
     total_price = serializers.DecimalField(
         max_digits=10,
         decimal_places=2,

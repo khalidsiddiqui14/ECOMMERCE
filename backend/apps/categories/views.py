@@ -6,11 +6,8 @@ from .serializers import CategorySerializer
 
 
 class IsAdminOrReadOnly(BasePermission):
-    """
-    Anyone can view categories.
-    Only ADMIN users can create, update, or delete categories.
-    """
 
+    # Allow everyone to view categories and only admins to modify them
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
@@ -22,7 +19,6 @@ class IsAdminOrReadOnly(BasePermission):
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
 
@@ -43,8 +39,35 @@ class CategoryListCreateView(generics.ListCreateAPIView):
         "name",
     ]
 
+    # Return active categories publicly and all categories to admins
+    def get_queryset(self):
+        queryset = Category.objects.all()
+
+        if (
+            self.request.user.is_authenticated
+            and self.request.user.role == "ADMIN"
+        ):
+            return queryset
+
+        return queryset.filter(
+            is_active=True,
+        )
+
 
 class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
+
+    # Return active categories publicly and all categories to admins
+    def get_queryset(self):
+        queryset = Category.objects.all()
+
+        if (
+            self.request.user.is_authenticated
+            and self.request.user.role == "ADMIN"
+        ):
+            return queryset
+
+        return queryset.filter(
+            is_active=True,
+        )
