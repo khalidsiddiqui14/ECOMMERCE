@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   getCart,
@@ -8,19 +8,31 @@ import {
 } from "../services/cartService";
 
 function Cart() {
+  const navigate = useNavigate();
+
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadCart = async () => {
-    try {
-      setError("");
+  const [updatingItemId, setUpdatingItemId] =
+    useState(null);
 
+  const [removingItemId, setRemovingItemId] =
+    useState(null);
+
+  const loadCart = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
       const data = await getCart();
 
       setCart(data);
     } catch (error) {
-      console.error("CART ERROR:", error);
+      console.error(
+        "CART ERROR:",
+        error
+      );
 
       setError(
         error.response?.data?.detail ||
@@ -40,37 +52,60 @@ function Cart() {
     itemId,
     quantity
   ) => {
-    if (quantity < 1) return;
+    const newQuantity = Number(quantity);
+
+    if (
+      !Number.isInteger(newQuantity) ||
+      newQuantity < 1
+    ) {
+      return;
+    }
+
+    setUpdatingItemId(itemId);
+    setError("");
 
     try {
       const data = await updateCartItem(
         itemId,
-        quantity
+        newQuantity
       );
 
       setCart(data);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "CART QUANTITY ERROR:",
+        error
+      );
 
       setError(
         error.response?.data?.detail ||
           "Quantity update nahi ho paayi."
       );
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
   const handleRemove = async (itemId) => {
+    setRemovingItemId(itemId);
+    setError("");
+
     try {
       await removeCartItem(itemId);
 
       await loadCart();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "CART REMOVE ERROR:",
+        error
+      );
 
       setError(
         error.response?.data?.detail ||
           "Item remove nahi ho paya."
       );
+    } finally {
+      setRemovingItemId(null);
     }
   };
 
@@ -93,6 +128,7 @@ function Cart() {
           <p>{error}</p>
 
           <button
+            type="button"
             className="btn btn-primary"
             onClick={loadCart}
           >
@@ -103,22 +139,38 @@ function Cart() {
     );
   }
 
-  const items = cart?.items || [];
+  const items = Array.isArray(cart?.items)
+    ? cart.items
+    : [];
 
   const subtotal = items.reduce(
     (total, item) => {
+      const product =
+        item.product || {};
+
       const price = Number(
         item.price ??
           item.product_price ??
-          item.product?.price ??
+          product.price ??
           0
+      );
+
+      const quantity = Number(
+        item.quantity || 0
       );
 
       return (
         total +
-        price * Number(item.quantity || 0)
+        price * quantity
       );
     },
+    0
+  );
+
+  const totalItems = items.reduce(
+    (total, item) =>
+      total +
+      Number(item.quantity || 0),
     0
   );
 
@@ -130,7 +182,10 @@ function Cart() {
             <h1>Shopping Cart</h1>
 
             <p>
-              Review your items before checkout.
+              {totalItems} item
+              {totalItems === 1
+                ? ""
+                : "s"} in your cart.
             </p>
           </div>
 
@@ -157,8 +212,8 @@ function Cart() {
             <h2>Your cart is empty</h2>
 
             <p>
-              Add some products to your cart and
-              they will appear here.
+              Add some products to your cart
+              and they will appear here.
             </p>
 
             <Link
@@ -182,15 +237,38 @@ function Cart() {
                     0
                 );
 
+                const quantity = Number(
+                  item.quantity || 0
+                );
+
+                const itemTotal =
+                  price * quantity;
+
+                const isUpdating =
+                  updatingItemId ===
+                  item.id;
+
+                const isRemoving =
+                  removingItemId ===
+                  item.id;
+
                 return (
-                  <div
+                  <article
                     className="cart-item"
                     key={item.id}
                   >
                     <div className="cart-item-image">
-                      {product.name
-                        ? "📦"
-                        : "🛍️"}
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={
+                            product.name ||
+                            "Product"
+                          }
+                        />
+                      ) : (
+                        "📦"
+                      )}
                     </div>
 
                     <div className="cart-item-info">
@@ -208,50 +286,69 @@ function Cart() {
                       </p>
 
                       <div className="cart-item-controls">
-                        <label>
+                        <label
+                          htmlFor={`quantity-${item.id}`}
+                        >
                           Quantity
                         </label>
 
                         <input
+                          id={`quantity-${item.id}`}
                           type="number"
                           min="1"
-                          value={item.quantity}
+                          value={quantity}
+                          disabled={
+                            isUpdating ||
+                            isRemoving
+                          }
                           onChange={(event) =>
                             handleQuantityChange(
                               item.id,
-                              Number(
-                                event.target.value
-                              )
+                              event.target.value
                             )
                           }
                         />
 
                         <button
+                          type="button"
+                          disabled={
+                            isUpdating ||
+                            isRemoving
+                          }
                           onClick={() =>
                             handleRemove(
                               item.id
                             )
                           }
                         >
-                          Remove
+                          {isRemoving
+                            ? "Removing..."
+                            : "Remove"}
                         </button>
                       </div>
                     </div>
 
                     <div className="cart-item-total">
                       ₹
-                      {(
-                        price *
-                        Number(item.quantity)
-                      ).toLocaleString("en-IN")}
+                      {itemTotal.toLocaleString(
+                        "en-IN"
+                      )}
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </section>
 
             <aside className="cart-summary">
               <h2>Order Summary</h2>
+
+              <div className="cart-summary-row">
+                <span>Items</span>
+
+                <strong>
+                  {totalItems}
+                </strong>
+              </div>
 
               <div className="cart-summary-row">
                 <span>Subtotal</span>
@@ -281,12 +378,15 @@ function Cart() {
                 </strong>
               </div>
 
-              <Link
-                to="/checkout"
+              <button
+                type="button"
                 className="btn btn-primary cart-checkout-button"
+                onClick={() =>
+                  navigate("/orders")
+                }
               >
                 Proceed to Checkout
-              </Link>
+              </button>
             </aside>
           </div>
         )}
