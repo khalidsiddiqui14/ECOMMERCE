@@ -14,6 +14,7 @@ function Navbar() {
           <Link to="/wishlist">Wishlist</Link>
           <Link to="/cart">Cart</Link>
           <Link to="/orders">Orders</Link>
+          <Link to="/settings">Settings</Link>
         </nav>
 
         <div className="nav-actions">

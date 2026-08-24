@@ -21,6 +21,8 @@ import Checkout from "./pages/Checkout";
 import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
+import Settings from "./pages/Settings";
+import ChangePassword from "./pages/ChangePassword";
 
 import VendorDashboard from "./pages/vendor/VendorDashboard";
 import VendorProducts from "./pages/vendor/VendorProducts";
@@ -32,12 +34,15 @@ import VendorProductCreate from "./pages/vendor/VendorProductCreate";
 import OrderDetail from "./pages/OrderDetail";
 import EditProduct from "./pages/vendor/EditProduct";
 
+
 function App() {
   return (
     <BrowserRouter>
+
       <Navbar />
 
       <Routes>
+
         <Route
           path="/"
           element={<Home />}
@@ -63,7 +68,9 @@ function App() {
           element={<ProductDetail />}
         />
 
+
         <Route element={<ProtectedRoute />}>
+
           <Route
             path="/cart"
             element={<Cart />}
@@ -95,12 +102,25 @@ function App() {
           />
 
           <Route
+            path="/settings"
+            element={<Settings />}
+          />
+
+          <Route
+            path="/change-password"
+            element={<ChangePassword />}
+          />
+
+          <Route
             path="/notifications"
             element={<Notifications />}
           />
+
         </Route>
 
+
         <Route element={<VendorRoute />}>
+
           <Route
             path="/vendor/dashboard"
             element={<VendorDashboard />}
@@ -135,12 +155,16 @@ function App() {
             path="/vendor/profile"
             element={<VendorProfile />}
           />
+
         </Route>
+
       </Routes>
 
       <Footer />
+
     </BrowserRouter>
   );
 }
+
 
 export default App;

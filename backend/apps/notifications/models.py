@@ -55,4 +55,41 @@ class Notification(models.Model):
         verbose_name_plural = "Notifications"
 
     def __str__(self):
-        return f"{self.user.email} - {self.title}"      
+        return f"{self.user.email} - {self.title}" 
+class NotificationPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notification_preferences",
+    )
+
+    order_updates = models.BooleanField(
+        default=True,
+    )
+
+    promotions = models.BooleanField(
+        default=True,
+    )
+
+    email_notifications = models.BooleanField(
+        default=True,
+    )
+
+    push_notifications = models.BooleanField(
+        default=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = "Notification Preference"
+        verbose_name_plural = "Notification Preferences"
+
+    def __str__(self):
+        return f"Notification preferences - {self.user.email}"     

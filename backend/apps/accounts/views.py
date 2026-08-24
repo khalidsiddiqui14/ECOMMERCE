@@ -4,7 +4,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    UserSerializer,
+    ChangePasswordSerializer,
+)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -16,7 +21,6 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    # Authenticate user and return JWT tokens
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -43,12 +47,10 @@ class LoginView(APIView):
 class ProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    # Return the authenticated user's profile
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
-    # Update the authenticated user's profile
     def put(self, request):
         serializer = UserSerializer(
             request.user,
@@ -60,3 +62,33 @@ class ProfileView(APIView):
         serializer.save()
 
         return Response(serializer.data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+
+        if not user.check_password(
+            serializer.validated_data["current_password"]
+        ):
+            return Response(
+                {"detail": "Current password is incorrect."},
+                status=400,
+            )
+
+        user.set_password(
+            serializer.validated_data["new_password"]
+        )
+
+        user.save(
+            update_fields=["password"]
+        )
+
+        return Response(
+            {"detail": "Password changed successfully."}
+        )

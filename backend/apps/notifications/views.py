@@ -4,8 +4,15 @@ from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Notification
-from .serializers import NotificationSerializer
+from .models import (
+    Notification,
+    NotificationPreference,
+)
+
+from .serializers import (
+    NotificationSerializer,
+    NotificationPreferenceSerializer,
+)
 
 
 class NotificationListView(generics.ListAPIView):
@@ -68,3 +75,17 @@ class NotificationMarkReadView(
             serializer.data,
             status=status.HTTP_200_OK,
         )
+class NotificationPreferenceView(
+    generics.RetrieveUpdateAPIView
+):
+    serializer_class = NotificationPreferenceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        preference, created = (
+            NotificationPreference.objects.get_or_create(
+                user=self.request.user,
+            )
+        )
+
+        return preference

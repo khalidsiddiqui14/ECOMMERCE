@@ -25,3 +25,21 @@ export const markNotificationRead = async (
 
   return response.data;
 };
+export const getNotificationPreferences = async () => {
+  const response = await api.get(
+    "notifications/preferences/"
+  );
+
+  return response.data;
+};
+
+export const updateNotificationPreferences = async (
+  data
+) => {
+  const response = await api.patch(
+    "notifications/preferences/",
+    data
+  );
+
+  return response.data;
+};
