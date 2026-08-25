@@ -8,7 +8,6 @@ import {
   updateVendorStore,
 } from "../../services/vendorService";
 
-
 function VendorStore() {
   const [store, setStore] = useState({
     name: "",
@@ -34,7 +33,6 @@ function VendorStore() {
 
   const [success, setSuccess] =
     useState("");
-
 
   const loadStore = async () => {
     try {
@@ -75,11 +73,62 @@ function VendorStore() {
     }
   };
 
-
   useEffect(() => {
-    loadStore();
-  }, []);
+    let cancelled = false;
 
+    const fetchStore = async () => {
+      try {
+        if (!cancelled) {
+          setLoading(true);
+          setError("");
+          setSuccess("");
+        }
+
+        const data =
+          await getVendorStore();
+
+        if (!cancelled) {
+          setStore({
+            name: data.name || "",
+            slug: data.slug || "",
+            description:
+              data.description || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            address: data.address || "",
+            city: data.city || "",
+            state: data.state || "",
+            country: data.country || "",
+            postal_code:
+              data.postal_code || "",
+          });
+        }
+      } catch (error) {
+        console.error(
+          "VENDOR STORE ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Store load nahi ho paaya."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStore();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (event) => {
     const {
@@ -92,7 +141,6 @@ function VendorStore() {
       [name]: value,
     }));
   };
-
 
   const handleSubmit = async (
     event
@@ -182,7 +230,6 @@ function VendorStore() {
     }
   };
 
-
   if (loading) {
     return (
       <main className="vendor-store-page">
@@ -194,7 +241,6 @@ function VendorStore() {
       </main>
     );
   }
-
 
   return (
     <main className="vendor-store-page">
@@ -218,7 +264,6 @@ function VendorStore() {
           </div>
         </div>
 
-
         {error && (
           <div className="auth-error">
             {error}
@@ -236,29 +281,22 @@ function VendorStore() {
           </div>
         )}
 
-
         {success && (
           <div className="auth-success">
             {success}
           </div>
         )}
 
-
         <section className="vendor-store-card">
-
           <form
             onSubmit={handleSubmit}
           >
-
             <div className="store-form-section">
-
               <h2>
                 Store Information
               </h2>
 
-
               <div className="form-group">
-
                 <label htmlFor="name">
                   Store Name
                 </label>
@@ -273,12 +311,9 @@ function VendorStore() {
                   }
                   required
                 />
-
               </div>
 
-
               <div className="form-group">
-
                 <label htmlFor="slug">
                   Store Slug
                 </label>
@@ -293,12 +328,9 @@ function VendorStore() {
                   }
                   required
                 />
-
               </div>
 
-
               <div className="form-group">
-
                 <label htmlFor="description">
                   Description
                 </label>
@@ -314,23 +346,16 @@ function VendorStore() {
                     handleChange
                   }
                 />
-
               </div>
-
             </div>
 
-
             <div className="store-form-section">
-
               <h2>
                 Contact Information
               </h2>
 
-
               <div className="store-form-grid">
-
                 <div className="form-group">
-
                   <label htmlFor="email">
                     Email
                   </label>
@@ -344,12 +369,9 @@ function VendorStore() {
                       handleChange
                     }
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label htmlFor="phone">
                     Phone
                   </label>
@@ -363,23 +385,16 @@ function VendorStore() {
                       handleChange
                     }
                   />
-
                 </div>
-
               </div>
-
             </div>
 
-
             <div className="store-form-section">
-
               <h2>
                 Address
               </h2>
 
-
               <div className="form-group">
-
                 <label htmlFor="address">
                   Address
                 </label>
@@ -396,14 +411,10 @@ function VendorStore() {
                   }
                   required
                 />
-
               </div>
 
-
               <div className="store-form-grid">
-
                 <div className="form-group">
-
                   <label htmlFor="city">
                     City
                   </label>
@@ -418,12 +429,9 @@ function VendorStore() {
                     }
                     required
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label htmlFor="state">
                     State
                   </label>
@@ -438,12 +446,9 @@ function VendorStore() {
                     }
                     required
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label htmlFor="country">
                     Country
                   </label>
@@ -460,12 +465,9 @@ function VendorStore() {
                     }
                     required
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label htmlFor="postal_code">
                     Postal Code
                   </label>
@@ -482,16 +484,11 @@ function VendorStore() {
                     }
                     required
                   />
-
                 </div>
-
               </div>
-
             </div>
 
-
             <div className="store-form-actions">
-
               <button
                 type="submit"
                 className="btn btn-primary"
@@ -501,17 +498,12 @@ function VendorStore() {
                   ? "Saving..."
                   : "Save Changes"}
               </button>
-
             </div>
-
           </form>
-
         </section>
-
       </div>
     </main>
   );
 }
-
 
 export default VendorStore;

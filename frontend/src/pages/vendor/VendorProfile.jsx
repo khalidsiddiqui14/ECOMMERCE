@@ -78,7 +78,60 @@ function VendorProfile() {
   };
 
   useEffect(() => {
-    loadProfile();
+    let cancelled = false;
+
+    const fetchProfile = async () => {
+      try {
+        if (!cancelled) {
+          setLoading(true);
+          setError("");
+          setSuccess("");
+        }
+
+        const data =
+          await getVendorProfile();
+
+        if (!cancelled) {
+          setProfile((previous) => ({
+            ...previous,
+            ...data,
+            username:
+              data.username ||
+              data.user ||
+              "",
+            email:
+              data.email ||
+              "",
+            role:
+              data.role ||
+              "VENDOR",
+          }));
+        }
+      } catch (error) {
+        console.error(
+          "VENDOR PROFILE ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Vendor profile load nahi ho paaya."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleChange = (

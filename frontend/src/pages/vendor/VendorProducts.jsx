@@ -11,7 +11,6 @@ import {
   deleteVendorProduct,
 } from "../../services/vendorService";
 
-
 function VendorProducts() {
   const [products, setProducts] =
     useState([]);
@@ -30,7 +29,6 @@ function VendorProducts() {
 
   const [status, setStatus] =
     useState("");
-
 
   // =========================
   // Load Products
@@ -63,11 +61,50 @@ function VendorProducts() {
     }
   };
 
-
   useEffect(() => {
-    loadProducts();
-  }, []);
+    let cancelled = false;
 
+    const fetchProducts = async () => {
+      try {
+        if (!cancelled) {
+          setError("");
+          setLoading(true);
+        }
+
+        const data =
+          await getVendorProducts();
+
+        if (!cancelled) {
+          setProducts(
+            data.results || data
+          );
+        }
+      } catch (error) {
+        console.error(
+          "VENDOR PRODUCTS ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Products load nahi ho paaye."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // =========================
   // Delete Product
@@ -112,7 +149,6 @@ function VendorProducts() {
     }
   };
 
-
   // =========================
   // Search + Filters
   // =========================
@@ -121,7 +157,6 @@ function VendorProducts() {
     return products.filter((product) => {
       const searchValue =
         search.toLowerCase().trim();
-
 
       const matchesSearch =
         !searchValue ||
@@ -135,18 +170,15 @@ function VendorProducts() {
           ?.toLowerCase()
           .includes(searchValue);
 
-
       const matchesCategory =
         !category ||
         String(product.category) ===
           String(category);
 
-
       const matchesStatus =
         !status ||
         product.status?.toLowerCase() ===
           status.toLowerCase();
-
 
       return (
         matchesSearch &&
@@ -160,7 +192,6 @@ function VendorProducts() {
     category,
     status,
   ]);
-
 
   // =========================
   // Categories
@@ -183,7 +214,6 @@ function VendorProducts() {
     );
   }, [products]);
 
-
   // =========================
   // Loading
   // =========================
@@ -197,7 +227,6 @@ function VendorProducts() {
       </main>
     );
   }
-
 
   // =========================
   // Main UI
@@ -228,7 +257,6 @@ function VendorProducts() {
             </p>
           </div>
 
-
           {/* Add Product */}
 
           <Link
@@ -239,7 +267,6 @@ function VendorProducts() {
           </Link>
 
         </div>
-
 
         {/* ==================== */}
         {/* Error */}
@@ -265,7 +292,6 @@ function VendorProducts() {
           </div>
         )}
 
-
         {/* ==================== */}
         {/* Toolbar */}
         {/* ==================== */}
@@ -285,7 +311,6 @@ function VendorProducts() {
             }
           />
 
-
           {/* Category */}
 
           <select
@@ -301,7 +326,6 @@ function VendorProducts() {
               All Categories
             </option>
 
-
             {categories.map(
               (categoryId) => (
                 <option
@@ -314,7 +338,6 @@ function VendorProducts() {
             )}
 
           </select>
-
 
           {/* Status */}
 
@@ -346,7 +369,6 @@ function VendorProducts() {
           </select>
 
         </div>
-
 
         {/* ==================== */}
         {/* Product Table */}
@@ -421,7 +443,6 @@ function VendorProducts() {
 
               </thead>
 
-
               <tbody>
 
                 {filteredProducts.map(
@@ -439,7 +460,6 @@ function VendorProducts() {
                         </strong>
                       </td>
 
-
                       {/* SKU */}
 
                       <td>
@@ -447,14 +467,12 @@ function VendorProducts() {
                           "-"}
                       </td>
 
-
                       {/* Category */}
 
                       <td>
                         Category #
                         {product.category}
                       </td>
-
 
                       {/* Price */}
 
@@ -468,13 +486,11 @@ function VendorProducts() {
                         )}
                       </td>
 
-
                       {/* Stock */}
 
                       <td>
                         {product.stock}
                       </td>
-
 
                       {/* Status */}
 
@@ -491,7 +507,6 @@ function VendorProducts() {
 
                       </td>
 
-
                       {/* Actions */}
 
                       <td>
@@ -507,7 +522,6 @@ function VendorProducts() {
                             View
                           </Link>
 
-
                           {/* Edit */}
 
                           <Link
@@ -516,7 +530,6 @@ function VendorProducts() {
                           >
                             Edit
                           </Link>
-
 
                           {/* Delete */}
 
@@ -554,6 +567,5 @@ function VendorProducts() {
     </main>
   );
 }
-
 
 export default VendorProducts;

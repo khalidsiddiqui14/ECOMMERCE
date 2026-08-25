@@ -48,7 +48,48 @@ function Notifications() {
   };
 
   useEffect(() => {
-    loadNotifications();
+    let cancelled = false;
+
+    const fetchNotifications = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data =
+          await getNotifications();
+
+        if (!cancelled) {
+          setNotifications(
+            Array.isArray(data)
+              ? data
+              : data?.results || []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "NOTIFICATIONS ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Notifications load nahi ho paayi."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchNotifications();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleMarkRead = async (

@@ -45,7 +45,43 @@ function Cart() {
   };
 
   useEffect(() => {
-    loadCart();
+    let cancelled = false;
+
+    const fetchCart = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await getCart();
+
+        if (!cancelled) {
+          setCart(data);
+        }
+      } catch (error) {
+        console.error(
+          "CART ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Cart load nahi ho paaya."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchCart();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleQuantityChange = async (

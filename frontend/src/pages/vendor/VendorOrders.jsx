@@ -44,7 +44,50 @@ function VendorOrders() {
   };
 
   useEffect(() => {
-    loadOrders();
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      try {
+        if (!cancelled) {
+          setError("");
+          setLoading(true);
+        }
+
+        const data =
+          await getVendorOrders();
+
+        if (!cancelled) {
+          setOrders(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "VENDOR ORDERS ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Orders load nahi ho paaye."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchOrders();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const updateStatus = async (

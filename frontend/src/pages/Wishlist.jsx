@@ -37,7 +37,49 @@ function Wishlist() {
   };
 
   useEffect(() => {
-    loadWishlist();
+    let cancelled = false;
+
+    const fetchWishlist = async () => {
+      try {
+        if (!cancelled) {
+          setError("");
+          setLoading(true);
+        }
+
+        const data = await getWishlist();
+
+        if (!cancelled) {
+          setWishlist(
+            data.results ||
+              data.items ||
+              data
+          );
+        }
+      } catch (error) {
+        console.error(
+          "WISHLIST ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.message ||
+              "Wishlist load nahi ho paayi."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchWishlist();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleRemove = async (itemId) => {
