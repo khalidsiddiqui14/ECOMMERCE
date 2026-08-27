@@ -38,3 +38,10 @@ local_data_backup.json
 
 # Docker
 docker-compose.override.yml
+# Database backups
+db.sqlite3.backup
+
+# Temporary production data migration files
+production_data.json
+production_app_data.json
+production_data_clean.json
