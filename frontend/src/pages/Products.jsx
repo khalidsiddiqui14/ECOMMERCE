@@ -1,18 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { getProducts } from "../services/productService";
 import { addToCart } from "../services/cartService";
 
 function Products() {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] =
+    useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [sort, setSort] = useState("latest");
+  const [error, setError] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
+
+  const [category, setCategory] =
+    useState("");
+
+  const [sort, setSort] =
+    useState("latest");
 
   const [addingProductId, setAddingProductId] =
     useState(null);
@@ -23,35 +36,92 @@ function Products() {
   const [cartError, setCartError] =
     useState("");
 
+  // Load Products
+  const loadProducts = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data =
+        await getProducts();
+
+      const productList =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(
+                data?.results
+              )
+            ? data.results
+            : [];
+
+      setProducts(productList);
+    } catch (error) {
+      console.error(
+        "PRODUCTS ERROR:",
+        error
+      );
+
+      setError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Products load nahi ho paaye."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadProducts = async () => {
-      setLoading(true);
-      setError("");
+    let cancelled = false;
 
-      try {
-        const data = await getProducts();
+    const fetchProducts =
+      async () => {
+        try {
+          const data =
+            await getProducts();
 
-        setProducts(
-          Array.isArray(data)
-            ? data
-            : data?.results || []
-        );
-      } catch (error) {
-        console.error(
-          "PRODUCTS ERROR:",
-          error
-        );
+          if (cancelled) {
+            return;
+          }
 
-        setError(
-          error.response?.data?.detail ||
-            "Products load nahi ho paaye."
-        );
-      } finally {
-        setLoading(false);
-      }
+          const productList =
+            Array.isArray(data)
+              ? data
+              : Array.isArray(
+                    data?.results
+                  )
+                ? data.results
+                : [];
+
+          setProducts(productList);
+          setError("");
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            "PRODUCTS ERROR:",
+            error
+          );
+
+          setError(
+            error.response?.data?.detail ||
+              error.response?.data?.message ||
+              "Products load nahi ho paaye."
+          );
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
+
+    fetchProducts();
+
+    return () => {
+      cancelled = true;
     };
-
-    loadProducts();
   }, []);
 
   const categories = useMemo(() => {
@@ -63,129 +133,220 @@ function Products() {
       )
       .filter(Boolean);
 
-    return [...new Set(values)];
+    return [
+      ...new Set(values),
+    ].sort((a, b) =>
+      String(a).localeCompare(
+        String(b)
+      )
+    );
   }, [products]);
 
-  const filteredProducts = useMemo(() => {
-    let result = [...products];
+  const filteredProducts =
+    useMemo(() => {
+      let result = [
+        ...products,
+      ];
 
-    const searchValue =
-      search.trim().toLowerCase();
+      const searchValue =
+        search
+          .trim()
+          .toLowerCase();
 
-    if (searchValue) {
-      result = result.filter((product) => {
-        const name =
-          product.name?.toLowerCase() || "";
+      if (searchValue) {
+        result =
+          result.filter(
+            (product) => {
+              const name =
+                String(
+                  product.name ||
+                    ""
+                ).toLowerCase();
 
-        const description =
-          product.description?.toLowerCase() ||
-          "";
+              const description =
+                String(
+                  product.description ||
+                    ""
+                ).toLowerCase();
 
-        const categoryName = String(
-          product.category_name ||
-            product.category ||
-            ""
-        ).toLowerCase();
+              const categoryName =
+                String(
+                  product.category_name ||
+                    product.category ||
+                    ""
+                ).toLowerCase();
 
-        return (
-          name.includes(searchValue) ||
-          description.includes(searchValue) ||
-          categoryName.includes(searchValue)
+              return (
+                name.includes(
+                  searchValue
+                ) ||
+                description.includes(
+                  searchValue
+                ) ||
+                categoryName.includes(
+                  searchValue
+                )
+              );
+            }
+          );
+      }
+
+      if (category) {
+        result =
+          result.filter(
+            (product) => {
+              const productCategory =
+                String(
+                  product.category_name ||
+                    product.category ||
+                    ""
+                );
+
+              return (
+                productCategory ===
+                category
+              );
+            }
+          );
+      }
+
+      if (sort === "price-low") {
+        result.sort(
+          (a, b) =>
+            Number(
+              a.price || 0
+            ) -
+            Number(
+              b.price || 0
+            )
         );
-      });
-    }
+      }
 
-    if (category) {
-      result = result.filter((product) => {
-        const productCategory = String(
-          product.category_name ||
-            product.category ||
-            ""
+      if (sort === "price-high") {
+        result.sort(
+          (a, b) =>
+            Number(
+              b.price || 0
+            ) -
+            Number(
+              a.price || 0
+            )
         );
+      }
 
-        return productCategory === category;
-      });
-    }
+      if (sort === "latest") {
+        result.sort(
+          (a, b) => {
+            const dateA =
+              new Date(
+                a.created_at || 0
+              ).getTime();
 
-    if (sort === "price-low") {
-      result.sort(
-        (a, b) =>
-          Number(a.price || 0) -
-          Number(b.price || 0)
-      );
-    }
+            const dateB =
+              new Date(
+                b.created_at || 0
+              ).getTime();
 
-    if (sort === "price-high") {
-      result.sort(
-        (a, b) =>
-          Number(b.price || 0) -
-          Number(a.price || 0)
-      );
-    }
+            return (
+              dateB - dateA
+            );
+          }
+        );
+      }
 
-    if (sort === "latest") {
-      result.sort((a, b) => {
-        const dateA = new Date(
-          a.created_at || 0
-        ).getTime();
+      return result;
+    }, [
+      products,
+      search,
+      category,
+      sort,
+    ]);
 
-        const dateB = new Date(
-          b.created_at || 0
-        ).getTime();
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    Boolean(category) ||
+    sort !== "latest";
 
-        return dateB - dateA;
-      });
-    }
-
-    return result;
-  }, [
-    products,
-    search,
-    category,
-    sort,
-  ]);
-
-  const handleAddToCart = async (product) => {
-    if (!product?.id) {
-      return;
-    }
-
-    if (
-      product.stock !== undefined &&
-      Number(product.stock) <= 0
-    ) {
-      return;
-    }
-
-    setAddingProductId(product.id);
+  const clearFilters = () => {
+    setSearch("");
+    setCategory("");
+    setSort("latest");
     setCartMessage("");
     setCartError("");
-
-    try {
-      await addToCart(product.id, 1);
-
-      setCartMessage(
-        `${product.name} cart mein add ho gaya.`
-      );
-    } catch (error) {
-      console.error(
-        "ADD TO CART ERROR:",
-        error
-      );
-
-      setCartError(
-        error.response?.data?.detail ||
-          "Product cart mein add nahi ho paaya."
-      );
-    } finally {
-      setAddingProductId(null);
-    }
   };
+
+  const handleAddToCart =
+    async (product) => {
+      if (!product?.id) {
+        return;
+      }
+
+      const hasStock =
+        product.stock ===
+          undefined ||
+        Number(product.stock) >
+          0;
+
+      if (!hasStock) {
+        return;
+      }
+
+      setAddingProductId(
+        product.id
+      );
+
+      setCartMessage("");
+      setCartError("");
+
+      try {
+        await addToCart(
+          product.id,
+          1
+        );
+
+        setCartMessage(
+          `${
+            product.name ||
+            "Product"
+          } cart mein add ho gaya.`
+        );
+      } catch (error) {
+        console.error(
+          "ADD TO CART ERROR:",
+          error
+        );
+
+        setCartError(
+          error.response?.data
+            ?.detail ||
+            error.response?.data
+              ?.message ||
+            "Product cart mein add nahi ho paaya."
+        );
+      } finally {
+        setAddingProductId(
+          null
+        );
+      }
+    };
 
   if (loading) {
     return (
       <main className="products-page">
-        <div className="products-loading">
+        <section className="products-header">
+          <h1>All Products</h1>
+
+          <p>
+            Discover our collection
+            of quality products.
+          </p>
+        </section>
+
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading products...
         </div>
       </main>
@@ -195,8 +356,31 @@ function Products() {
   if (error) {
     return (
       <main className="products-page">
+        <section className="products-header">
+          <h1>All Products</h1>
+
+          <p>
+            Discover our collection
+            of quality products.
+          </p>
+        </section>
+
         <div className="products-error">
-          {error}
+          <h2>
+            Unable to load products
+          </h2>
+
+          <p>{error}</p>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={
+              loadProducts
+            }
+          >
+            Try Again
+          </button>
         </div>
       </main>
     );
@@ -208,19 +392,26 @@ function Products() {
         <h1>All Products</h1>
 
         <p>
-          Discover our collection of quality
-          products.
+          Discover our collection
+          of quality products.
         </p>
       </section>
 
       {cartMessage && (
-        <div className="auth-success">
+        <div
+          className="auth-success"
+          role="status"
+          aria-live="polite"
+        >
           {cartMessage}
         </div>
       )}
 
       {cartError && (
-        <div className="auth-error">
+        <div
+          className="auth-error"
+          role="alert"
+        >
           {cartError}
         </div>
       )}
@@ -238,7 +429,9 @@ function Products() {
               id="category"
               value={category}
               onChange={(event) =>
-                setCategory(event.target.value)
+                setCategory(
+                  event.target.value
+                )
               }
             >
               <option value="">
@@ -248,7 +441,9 @@ function Products() {
               {categories.map(
                 (item) => (
                   <option
-                    key={item}
+                    key={String(
+                      item
+                    )}
                     value={item}
                   >
                     {item}
@@ -267,7 +462,9 @@ function Products() {
               id="sort"
               value={sort}
               onChange={(event) =>
-                setSort(event.target.value)
+                setSort(
+                  event.target.value
+                )
               }
             >
               <option value="latest">
@@ -283,85 +480,188 @@ function Products() {
               </option>
             </select>
           </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={
+                clearFilters
+              }
+            >
+              Clear Filters
+            </button>
+          )}
         </aside>
 
         <div className="products-area">
           <div className="products-topbar">
             <span>
-              {filteredProducts.length} Products
+              Showing{" "}
+              {
+                filteredProducts.length
+              }{" "}
+              of{" "}
+              {products.length}{" "}
+              Products
             </span>
 
-            <input
-              type="search"
-              placeholder="Search products..."
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-            />
+            <div>
+              <label
+                htmlFor="product-search"
+                className="sr-only"
+              >
+                Search products
+              </label>
+
+              <input
+                id="product-search"
+                type="search"
+                placeholder="Search products..."
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value
+                  )
+                }
+                autoComplete="off"
+              />
+
+              {search && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSearch("")
+                  }
+                  aria-label="Clear product search"
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {filteredProducts.length ===
+          0 ? (
             <div className="products-empty">
-              <h2>No Products Found</h2>
+              <h2>
+                No Products Found
+              </h2>
 
               <p>
-                Try changing your search or
-                filters.
+                Try changing your
+                search or filters.
               </p>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={
+                    clearFilters
+                  }
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="products-grid">
               {filteredProducts.map(
                 (product) => {
                   const stock =
-                    Number(product.stock);
+                    Number(
+                      product.stock
+                    );
 
                   const hasStock =
-                    product.stock === undefined ||
+                    product.stock ===
+                      undefined ||
                     stock > 0;
 
                   const isAdding =
                     addingProductId ===
                     product.id;
 
+                  const productName =
+                    product.name ||
+                    "Product";
+
+                  const productCategory =
+                    product.category_name ||
+                    product.category ||
+                    "Product";
+
+                  const productPrice =
+                    Number(
+                      product.price ||
+                        0
+                    );
+
                   return (
-                    <div
+                    <article
                       className="shop-product-card"
-                      key={product.id}
+                      key={
+                        product.id
+                      }
                     >
-                      <div className="shop-product-image">
-                        {product.image ? (
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                          />
-                        ) : (
-                          "📦"
-                        )}
-                      </div>
+                      <Link
+                        to={`/products/${product.id}`}
+                        aria-label={`View ${productName}`}
+                      >
+                        <div className="shop-product-image">
+                          {product.image ? (
+                            <img
+                              src={
+                                product.image
+                              }
+                              alt={
+                                productName
+                              }
+                              loading="lazy"
+                              onError={(
+                                event
+                              ) => {
+                                event.currentTarget.style.display =
+                                  "none";
+                              }}
+                            />
+                          ) : (
+                            <span aria-hidden="true">
+                              📦
+                            </span>
+                          )}
+                        </div>
+                      </Link>
 
                       <div className="shop-product-info">
                         <span className="shop-product-category">
-                          {product.category_name ||
-                            product.category ||
-                            "Product"}
+                          {
+                            productCategory
+                          }
                         </span>
 
                         <h3>
-                          {product.name}
+                          {
+                            productName
+                          }
                         </h3>
 
                         <p className="shop-product-price">
                           ₹
-                          {Number(
-                            product.price || 0
-                          ).toLocaleString(
+                          {productPrice.toLocaleString(
                             "en-IN"
                           )}
                         </p>
 
-                        <p className="stock-status">
+                        <p
+                          className={`stock-status ${
+                            hasStock
+                              ? "stock-available"
+                              : "stock-out"
+                          }`}
+                        >
                           {hasStock
                             ? product.stock !==
                               undefined
@@ -399,7 +699,7 @@ function Products() {
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 }
               )}

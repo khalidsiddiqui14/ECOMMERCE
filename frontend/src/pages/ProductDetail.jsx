@@ -11,7 +11,7 @@ function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [wishlistLoading, setWishlistLoading] =
     useState(false);
@@ -21,33 +21,153 @@ function ProductDetail() {
   const [wishlistSuccess, setWishlistSuccess] =
     useState("");
 
+  const [imageError, setImageError] =
+    useState(false);
+
   useEffect(() => {
+    let cancelled = false;
+
     const loadProduct = async () => {
+      if (!cancelled) {
+        setLoading(true);
+        setError("");
+        setProduct(null);
+        setImageError(false);
+        setQuantity(1);
+      }
+
       try {
         const data = await getProduct(id);
 
-        setProduct(data);
+        if (!data) {
+          throw new Error(
+            "Product data was not returned."
+          );
+        }
+
+        if (!cancelled) {
+          setProduct(data);
+        }
       } catch (error) {
         console.error(
           "PRODUCT DETAIL ERROR:",
           error
         );
 
-        setError(
-          error.response?.data?.detail ||
-            error.message ||
-            "Product load nahi ho paaya."
-        );
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.response?.data?.message ||
+              error.message ||
+              "Product load nahi ho paaya."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadProduct();
+    const timer = setTimeout(
+      loadProduct,
+      0
+    );
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [id]);
 
+  const stock = Number(
+    product?.stock ?? 0
+  );
+
+  const hasStock = stock > 0;
+
+  const handleQuantityChange = (
+    event
+  ) => {
+    const value =
+      event.target.value;
+
+    if (value === "") {
+      setQuantity("");
+      return;
+    }
+
+    const numericValue =
+      Number(value);
+
+    if (
+      !Number.isInteger(
+        numericValue
+      )
+    ) {
+      return;
+    }
+
+    if (numericValue < 1) {
+      setQuantity(1);
+      return;
+    }
+
+    if (numericValue > stock) {
+      setQuantity(stock);
+      return;
+    }
+
+    setQuantity(numericValue);
+  };
+
+  const handleDecrease = () => {
+    setQuantity((current) => {
+      const currentValue =
+        Number(current) || 1;
+
+      return Math.max(
+        1,
+        currentValue - 1
+      );
+    });
+  };
+
+  const handleIncrease = () => {
+    setQuantity((current) => {
+      const currentValue =
+        Number(current) || 1;
+
+      return Math.min(
+        stock,
+        currentValue + 1
+      );
+    });
+  };
+
   const handleAddToCart = async () => {
-    if (!product || product.stock <= 0) {
+    if (
+      !product ||
+      !hasStock ||
+      adding
+    ) {
+      return;
+    }
+
+    const selectedQuantity =
+      Number(quantity);
+
+    if (
+      !Number.isInteger(
+        selectedQuantity
+      ) ||
+      selectedQuantity < 1 ||
+      selectedQuantity > stock
+    ) {
+      setError(
+        "Please select a valid quantity."
+      );
+
       return;
     }
 
@@ -56,10 +176,17 @@ function ProductDetail() {
     setSuccess("");
 
     try {
-      await addToCart(product.id, quantity);
+      await addToCart(
+        product.id,
+        selectedQuantity
+      );
 
       setSuccess(
-        "Product cart me successfully add ho gaya."
+        `${selectedQuantity} ${
+          selectedQuantity === 1
+            ? "item"
+            : "items"
+        } cart me successfully add ho gaya.`
       );
     } catch (error) {
       console.error(
@@ -69,6 +196,7 @@ function ProductDetail() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           "Product cart me add nahi ho paaya."
       );
     } finally {
@@ -76,40 +204,51 @@ function ProductDetail() {
     }
   };
 
-  const handleAddToWishlist = async () => {
-    if (!product) {
-      return;
-    }
+  const handleAddToWishlist =
+    async () => {
+      if (
+        !product ||
+        wishlistLoading
+      ) {
+        return;
+      }
 
-    setWishlistLoading(true);
-    setError("");
-    setWishlistSuccess("");
+      setWishlistLoading(true);
+      setError("");
+      setWishlistSuccess("");
 
-    try {
-      await addToWishlist(product.id);
+      try {
+        await addToWishlist(
+          product.id
+        );
 
-      setWishlistSuccess(
-        "Product wishlist me add ho gaya."
-      );
-    } catch (error) {
-      console.error(
-        "WISHLIST ERROR:",
-        error
-      );
+        setWishlistSuccess(
+          "Product wishlist me add ho gaya."
+        );
+      } catch (error) {
+        console.error(
+          "WISHLIST ERROR:",
+          error
+        );
 
-      setError(
-        error.response?.data?.detail ||
-          "Product wishlist me add nahi ho paaya."
-      );
-    } finally {
-      setWishlistLoading(false);
-    }
-  };
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            "Product wishlist me add nahi ho paaya."
+        );
+      } finally {
+        setWishlistLoading(false);
+      }
+    };
 
   if (loading) {
     return (
       <main className="product-detail-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading product...
         </div>
       </main>
@@ -120,16 +259,30 @@ function ProductDetail() {
     return (
       <main className="product-detail-page">
         <div className="products-empty">
-          <h2>Product Not Found</h2>
+          <h2>
+            Product Not Found
+          </h2>
 
           <p>{error}</p>
 
-          <Link
-            to="/products"
-            className="btn btn-primary"
-          >
-            Back to Products
-          </Link>
+          <div className="detail-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() =>
+                window.location.reload()
+              }
+            >
+              Try Again
+            </button>
+
+            <Link
+              to="/products"
+              className="btn btn-secondary"
+            >
+              Back to Products
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -139,33 +292,68 @@ function ProductDetail() {
     return null;
   }
 
+  const productImages =
+    Array.isArray(
+      product.images
+    )
+      ? product.images
+      : [];
+
+  const primaryImage =
+    productImages.length > 0
+      ? productImages[0]
+      : product.image;
+
+  const productCategory =
+    product.category_name ||
+    product.category ||
+    "Product";
+
+  const productPrice = Number(
+    product.price || 0
+  );
+
   return (
     <main className="product-detail-page">
       <div className="product-detail-container">
         <div className="product-detail-image">
-          {product.images &&
-          product.images.length > 0 ? (
+          {primaryImage &&
+          !imageError ? (
             <img
-              src={product.images[0]}
-              alt={product.name}
+              src={primaryImage}
+              alt={
+                product.name ||
+                "Product"
+              }
+              onError={() =>
+                setImageError(true)
+              }
             />
           ) : (
-            <span>🎧</span>
+            <span
+              aria-label="Product image unavailable"
+              role="img"
+            >
+              📦
+            </span>
           )}
         </div>
 
         <div className="product-detail-info">
           <span className="shop-product-category">
-            Category #{product.category}
+            {productCategory}
           </span>
 
-          <h1>{product.name}</h1>
+          <h1>
+            {product.name ||
+              "Product"}
+          </h1>
 
           <p className="detail-price">
             ₹
-            {Number(
-              product.price
-            ).toLocaleString("en-IN")}
+            {productPrice.toLocaleString(
+              "en-IN"
+            )}
           </p>
 
           <p className="detail-description">
@@ -173,78 +361,142 @@ function ProductDetail() {
               "No description available."}
           </p>
 
-          <p className="stock-status">
-            {product.stock > 0
-              ? `${product.stock} items available`
+          <p
+            className={`stock-status ${
+              hasStock
+                ? "stock-available"
+                : "stock-out"
+            }`}
+          >
+            {hasStock
+              ? `${stock} ${
+                  stock === 1
+                    ? "item"
+                    : "items"
+                } available`
               : "Out of stock"}
           </p>
 
           {error && (
-            <div className="auth-error">
+            <div
+              className="auth-error"
+              role="alert"
+            >
               {error}
             </div>
           )}
 
           {success && (
-            <div className="auth-success">
+            <div
+              className="auth-success"
+              role="status"
+              aria-live="polite"
+            >
               {success}
             </div>
           )}
 
           {wishlistSuccess && (
-            <div className="auth-success">
+            <div
+              className="auth-success"
+              role="status"
+              aria-live="polite"
+            >
               {wishlistSuccess}
             </div>
           )}
 
-          {product.stock > 0 && (
+          {hasStock && (
             <div className="quantity-control">
               <label htmlFor="quantity">
                 Quantity
               </label>
 
-              <input
-                id="quantity"
-                type="number"
-                min="1"
-                max={product.stock}
-                value={quantity}
-                onChange={(event) => {
-                  const value = Number(
-                    event.target.value
-                  );
-
-                  if (
-                    value >= 1 &&
-                    value <= product.stock
-                  ) {
-                    setQuantity(value);
+              <div>
+                <button
+                  type="button"
+                  onClick={
+                    handleDecrease
                   }
-                }}
-              />
+                  disabled={
+                    adding ||
+                    Number(
+                      quantity
+                    ) <= 1
+                  }
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+
+                <input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  max={stock}
+                  value={quantity}
+                  onChange={
+                    handleQuantityChange
+                  }
+                  disabled={adding}
+                  inputMode="numeric"
+                  aria-describedby="quantity-help"
+                />
+
+                <button
+                  type="button"
+                  onClick={
+                    handleIncrease
+                  }
+                  disabled={
+                    adding ||
+                    Number(
+                      quantity
+                    ) >= stock
+                  }
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+
+              <span id="quantity-help">
+                Maximum available:{" "}
+                {stock}
+              </span>
             </div>
           )}
 
           <div className="detail-actions">
             <button
+              type="button"
               className="btn btn-primary"
               disabled={
-                product.stock <= 0 ||
-                adding
+                !hasStock ||
+                adding ||
+                wishlistLoading
               }
-              onClick={handleAddToCart}
+              onClick={
+                handleAddToCart
+              }
             >
               {adding
                 ? "Adding..."
-                : product.stock > 0
+                : hasStock
                   ? "Add to Cart"
                   : "Out of Stock"}
             </button>
 
             <button
+              type="button"
               className="btn btn-secondary"
-              onClick={handleAddToWishlist}
-              disabled={wishlistLoading}
+              onClick={
+                handleAddToWishlist
+              }
+              disabled={
+                wishlistLoading ||
+                adding
+              }
             >
               {wishlistLoading
                 ? "Adding..."

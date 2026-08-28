@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
@@ -20,7 +20,7 @@ function Cart() {
   const [removingItemId, setRemovingItemId] =
     useState(null);
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -36,13 +36,14 @@ function Cart() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           error.message ||
           "Cart load nahi ho paaya."
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +67,7 @@ function Cart() {
         if (!cancelled) {
           setError(
             error.response?.data?.detail ||
+              error.response?.data?.message ||
               error.message ||
               "Cart load nahi ho paaya."
           );
@@ -84,15 +86,15 @@ function Cart() {
     };
   }, []);
 
-  const handleQuantityChange = async (
+  const updateQuantity = async (
     itemId,
-    quantity
+    newQuantity
   ) => {
-    const newQuantity = Number(quantity);
+    const quantity = Number(newQuantity);
 
     if (
-      !Number.isInteger(newQuantity) ||
-      newQuantity < 1
+      !Number.isInteger(quantity) ||
+      quantity < 1
     ) {
       return;
     }
@@ -103,7 +105,7 @@ function Cart() {
     try {
       const data = await updateCartItem(
         itemId,
-        newQuantity
+        quantity
       );
 
       setCart(data);
@@ -115,6 +117,7 @@ function Cart() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           "Quantity update nahi ho paayi."
       );
     } finally {
@@ -122,7 +125,45 @@ function Cart() {
     }
   };
 
+  const handleQuantityChange = async (
+    itemId,
+    value
+  ) => {
+    await updateQuantity(
+      itemId,
+      value
+    );
+  };
+
+  const handleDecrease = async (
+    itemId,
+    quantity
+  ) => {
+    if (quantity <= 1) {
+      return;
+    }
+
+    await updateQuantity(
+      itemId,
+      quantity - 1
+    );
+  };
+
+  const handleIncrease = async (
+    itemId,
+    quantity
+  ) => {
+    await updateQuantity(
+      itemId,
+      quantity + 1
+    );
+  };
+
   const handleRemove = async (itemId) => {
+    if (removingItemId === itemId) {
+      return;
+    }
+
     setRemovingItemId(itemId);
     setError("");
 
@@ -138,6 +179,7 @@ function Cart() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           "Item remove nahi ho paya."
       );
     } finally {
@@ -148,7 +190,11 @@ function Cart() {
   if (loading) {
     return (
       <main className="cart-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading cart...
         </div>
       </main>
@@ -159,7 +205,9 @@ function Cart() {
     return (
       <main className="cart-page">
         <div className="products-empty">
-          <h2>Cart Error</h2>
+          <h2>
+            Unable to Load Cart
+          </h2>
 
           <p>{error}</p>
 
@@ -175,7 +223,9 @@ function Cart() {
     );
   }
 
-  const items = Array.isArray(cart?.items)
+  const items = Array.isArray(
+    cart?.items
+  )
     ? cart.items
     : [];
 
@@ -215,7 +265,9 @@ function Cart() {
       <div className="cart-container">
         <div className="cart-header">
           <div>
-            <h1>Shopping Cart</h1>
+            <h1>
+              Shopping Cart
+            </h1>
 
             <p>
               {totalItems} item
@@ -234,22 +286,31 @@ function Cart() {
         </div>
 
         {error && (
-          <div className="auth-error">
+          <div
+            className="auth-error"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
         {items.length === 0 ? (
           <div className="cart-empty">
-            <div className="cart-empty-icon">
+            <div
+              className="cart-empty-icon"
+              aria-hidden="true"
+            >
               🛒
             </div>
 
-            <h2>Your cart is empty</h2>
+            <h2>
+              Your cart is empty
+            </h2>
 
             <p>
-              Add some products to your cart
-              and they will appear here.
+              Add some products to your
+              cart and they will appear
+              here.
             </p>
 
             <Link
@@ -261,7 +322,10 @@ function Cart() {
           </div>
         ) : (
           <div className="cart-layout">
-            <section className="cart-items">
+            <section
+              className="cart-items"
+              aria-label="Shopping cart items"
+            >
               {items.map((item) => {
                 const product =
                   item.product || {};
@@ -301,9 +365,21 @@ function Cart() {
                             product.name ||
                             "Product"
                           }
+                          loading="lazy"
+                          onError={(
+                            event
+                          ) => {
+                            event.currentTarget.style.display =
+                              "none";
+                          }}
                         />
                       ) : (
-                        "📦"
+                        <span
+                          role="img"
+                          aria-label="Product image unavailable"
+                        >
+                          📦
+                        </span>
                       )}
                     </div>
 
@@ -328,22 +404,74 @@ function Cart() {
                           Quantity
                         </label>
 
-                        <input
-                          id={`quantity-${item.id}`}
-                          type="number"
-                          min="1"
-                          value={quantity}
-                          disabled={
-                            isUpdating ||
-                            isRemoving
-                          }
-                          onChange={(event) =>
-                            handleQuantityChange(
-                              item.id,
-                              event.target.value
-                            )
-                          }
-                        />
+                        <div>
+                          <button
+                            type="button"
+                            disabled={
+                              isUpdating ||
+                              isRemoving ||
+                              quantity <= 1
+                            }
+                            onClick={() =>
+                              handleDecrease(
+                                item.id,
+                                quantity
+                              )
+                            }
+                            aria-label={`Decrease quantity of ${
+                              item.product_name ||
+                              product.name ||
+                              "product"
+                            }`}
+                          >
+                            −
+                          </button>
+
+                          <input
+                            id={`quantity-${item.id}`}
+                            type="number"
+                            min="1"
+                            value={quantity}
+                            disabled={
+                              isUpdating ||
+                              isRemoving
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              handleQuantityChange(
+                                item.id,
+                                event.target.value
+                              )
+                            }
+                            aria-label={`Quantity for ${
+                              item.product_name ||
+                              product.name ||
+                              "product"
+                            }`}
+                          />
+
+                          <button
+                            type="button"
+                            disabled={
+                              isUpdating ||
+                              isRemoving
+                            }
+                            onClick={() =>
+                              handleIncrease(
+                                item.id,
+                                quantity
+                              )
+                            }
+                            aria-label={`Increase quantity of ${
+                              item.product_name ||
+                              product.name ||
+                              "product"
+                            }`}
+                          >
+                            +
+                          </button>
+                        </div>
 
                         <button
                           type="button"
@@ -362,6 +490,15 @@ function Cart() {
                             : "Remove"}
                         </button>
                       </div>
+
+                      {isUpdating && (
+                        <small
+                          role="status"
+                          aria-live="polite"
+                        >
+                          Updating quantity...
+                        </small>
+                      )}
                     </div>
 
                     <div className="cart-item-total">
@@ -376,7 +513,9 @@ function Cart() {
             </section>
 
             <aside className="cart-summary">
-              <h2>Order Summary</h2>
+              <h2>
+                Order Summary
+              </h2>
 
               <div className="cart-summary-row">
                 <span>Items</span>
@@ -400,11 +539,15 @@ function Cart() {
               <div className="cart-summary-row">
                 <span>Shipping</span>
 
-                <strong>Free</strong>
+                <strong>
+                  Free
+                </strong>
               </div>
 
               <div className="cart-summary-total">
-                <span>Total</span>
+                <span>
+                  Total
+                </span>
 
                 <strong>
                   ₹
@@ -418,7 +561,12 @@ function Cart() {
                 type="button"
                 className="btn btn-primary cart-checkout-button"
                 onClick={() =>
-                  navigate("/orders")
+                  navigate("/checkout")
+                }
+                disabled={
+                  updatingItemId !== null ||
+                  removingItemId !== null ||
+                  items.length === 0
                 }
               >
                 Proceed to Checkout

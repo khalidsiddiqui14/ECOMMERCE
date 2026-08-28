@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import {
   Link,
   useNavigate,
@@ -10,9 +14,25 @@ import {
   updateVendorProduct,
 } from "../../services/vendorService";
 
+const INITIAL_FORM = {
+  category: "",
+  brand: "",
+  name: "",
+  slug: "",
+  sku: "",
+  description: "",
+  price: "",
+  stock: "",
+  status: "PUBLISHED",
+  is_active: true,
+};
+
 function EditProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const [form, setForm] =
+    useState(INITIAL_FORM);
 
   const [loading, setLoading] =
     useState(true);
@@ -23,40 +43,47 @@ function EditProduct() {
   const [error, setError] =
     useState("");
 
-  const [form, setForm] = useState({
-    category: "",
-    brand: "",
-    name: "",
-    slug: "",
-    sku: "",
-    description: "",
-    price: "",
-    stock: "",
-    status: "PUBLISHED",
-    is_active: true,
-  });
+  const [success, setSuccess] =
+    useState("");
 
   useEffect(() => {
-    const loadProduct = async () => {
-      try {
-        setError("");
+    let cancelled = false;
 
+    const loadProduct = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
         const data =
           await getVendorProducts();
 
         const products =
-          data.results || data;
+          Array.isArray(data)
+            ? data
+            : Array.isArray(
+                  data?.results
+                )
+              ? data.results
+              : [];
 
-        const product = products.find(
-          (item) =>
-            String(item.id) === String(id)
-        );
-
-        if (!product) {
-          setError(
-            "Product not found."
+        const product =
+          products.find(
+            (item) =>
+              String(item.id) ===
+              String(id)
           );
 
+        if (!product) {
+          if (!cancelled) {
+            setError(
+              "Product not found."
+            );
+          }
+
+          return;
+        }
+
+        if (cancelled) {
           return;
         }
 
@@ -86,10 +113,12 @@ function EditProduct() {
             product.stock ?? "",
 
           status:
-            product.status ?? "PUBLISHED",
+            product.status ??
+            "PUBLISHED",
 
           is_active:
-            product.is_active ?? true,
+            product.is_active ??
+            true,
         });
       } catch (error) {
         console.error(
@@ -97,19 +126,33 @@ function EditProduct() {
           error
         );
 
-        setError(
-          error.response?.data?.detail ||
-            "Product load nahi ho paaya."
-        );
+        if (!cancelled) {
+          setError(
+            error.response?.data
+              ?.detail ||
+              error.response?.data
+                ?.message ||
+              error.message ||
+              "Product load nahi ho paaya."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadProduct();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  const handleChange = (event) => {
+  const handleChange = (
+    event
+  ) => {
     const {
       name,
       value,
@@ -125,42 +168,197 @@ function EditProduct() {
           ? checked
           : value,
     }));
+
+    setError("");
+    setSuccess("");
   };
 
-  const handleNameChange = (event) => {
-    const name = event.target.value;
+  const slugify = (value) =>
+    value
+      .toLowerCase()
+      .trim()
+      .replace(
+        /[^a-z0-9]+/g,
+        "-"
+      )
+      .replace(
+        /^-+|-+$/g,
+        "");
 
-    setForm((previous) => ({
-      ...previous,
+  const handleNameChange = (
+    event
+  ) => {
+    const name =
+      event.target.value;
 
-      name,
+    setForm((previous) => {
+      const generatedSlug =
+        slugify(name);
 
-      slug:
+      const previousGeneratedSlug =
+        slugify(previous.name);
+
+      const shouldUpdateSlug =
+        !previous.slug ||
         previous.slug ===
-          previous.name
-            .toLowerCase()
-            .trim()
-            .replace(
-              /[^a-z0-9]+/g,
-              "-"
-            )
-            .replace(
-              /^-|-$/g,
-              ""
-            )
-          ? name
-              .toLowerCase()
-              .trim()
-              .replace(
-                /[^a-z0-9]+/g,
-                "-"
-              )
-              .replace(
-                /^-|-$/g,
-                ""
-              )
+          previousGeneratedSlug;
+
+      return {
+        ...previous,
+
+        name,
+
+        slug: shouldUpdateSlug
+          ? generatedSlug
           : previous.slug,
-    }));
+      };
+    });
+
+    setError("");
+    setSuccess("");
+  };
+
+  const validateForm = () => {
+    const category =
+      Number(form.category);
+
+    const price =
+      Number(form.price);
+
+    const stock =
+      Number(form.stock);
+
+    const name =
+      form.name.trim();
+
+    const slug =
+      form.slug.trim();
+
+    const sku =
+      form.sku.trim();
+
+    const description =
+      form.description.trim();
+
+    if (
+      !Number.isInteger(
+        category
+      ) ||
+      category <= 0
+    ) {
+      return "Please enter a valid Category ID.";
+    }
+
+    if (!name) {
+      return "Product name is required.";
+    }
+
+    if (!slug) {
+      return "Product slug is required.";
+    }
+
+    if (!sku) {
+      return "SKU is required.";
+    }
+
+    if (!description) {
+      return "Product description is required.";
+    }
+
+    if (
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
+      return "Please enter a valid product price.";
+    }
+
+    if (
+      !Number.isInteger(stock) ||
+      stock < 0
+    ) {
+      return "Stock must be a whole number greater than or equal to 0.";
+    }
+
+    if (
+      ![
+        "DRAFT",
+        "PUBLISHED",
+        "OUT_OF_STOCK",
+      ].includes(form.status)
+    ) {
+      return "Please select a valid product status.";
+    }
+
+    if (
+      form.brand !== "" &&
+      (!Number.isInteger(
+        Number(form.brand)
+      ) ||
+        Number(form.brand) <= 0)
+    ) {
+      return "Please enter a valid Brand ID.";
+    }
+
+    return "";
+  };
+
+  const formatApiError = (
+    error
+  ) => {
+    const data =
+      error.response?.data;
+
+    if (!data) {
+      return (
+        error.message ||
+        "Product update nahi ho paaya."
+      );
+    }
+
+    if (
+      typeof data === "string"
+    ) {
+      return data;
+    }
+
+    if (data.detail) {
+      return Array.isArray(
+        data.detail
+      )
+        ? data.detail.join(
+            ", "
+          )
+        : String(data.detail);
+    }
+
+    if (data.message) {
+      return Array.isArray(
+        data.message
+      )
+        ? data.message.join(
+            ", "
+          )
+        : String(data.message);
+    }
+
+    return Object.entries(data)
+      .map(
+        ([field, message]) => {
+          const value =
+            Array.isArray(message)
+              ? message.join(", ")
+              : typeof message ===
+                  "object" &&
+                message !== null
+              ? JSON.stringify(
+                  message
+                )
+              : String(message);
+
+          return `${field}: ${value}`;
+        }
+      )
+      .join(" | ");
   };
 
   const handleSubmit = async (
@@ -169,6 +367,18 @@ function EditProduct() {
     event.preventDefault();
 
     setError("");
+    setSuccess("");
+
+    const validationError =
+      validateForm();
+
+    if (validationError) {
+      setError(
+        validationError
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -186,64 +396,48 @@ function EditProduct() {
         description:
           form.description.trim(),
 
-        price: form.price,
+        price: Number(
+          form.price
+        ).toFixed(2),
 
-        stock: Number(form.stock),
+        stock: Number(
+          form.stock
+        ),
 
         status: form.status,
 
-        is_active: form.is_active,
-      };
+        is_active:
+          form.is_active,
 
-      if (form.brand !== "") {
-        productData.brand = Number(
-          form.brand
-        );
-      } else {
-        productData.brand = null;
-      }
+        brand:
+          form.brand !== ""
+            ? Number(form.brand)
+            : null,
+      };
 
       await updateVendorProduct(
         id,
         productData
       );
 
-      navigate(
-        "/vendor/products"
+      setSuccess(
+        "Product updated successfully."
       );
+
+      setTimeout(() => {
+        navigate(
+          "/vendor/products"
+        );
+      }, 1000);
     } catch (error) {
       console.error(
         "UPDATE PRODUCT ERROR:",
         error
       );
 
-      const data =
-        error.response?.data;
-
-      if (data) {
-        const messages =
-          Object.entries(data)
-            .map(
-              ([field, message]) => {
-                const text =
-                  Array.isArray(message)
-                    ? message.join(", ")
-                    : message;
-
-                return `${field}: ${text}`;
-              }
-            )
-            .join(" | ");
-
-        setError(
-          messages ||
-            "Product update nahi ho paaya."
-        );
-      } else {
-        setError(
-          "Product update nahi ho paaya."
-        );
-      }
+      setError(
+        formatApiError(error)
+      );
     } finally {
       setSaving(false);
     }
@@ -252,7 +446,11 @@ function EditProduct() {
   if (loading) {
     return (
       <main className="vendor-products-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading product...
         </div>
       </main>
@@ -285,6 +483,7 @@ function EditProduct() {
   return (
     <main className="vendor-create-product-page">
       <div className="vendor-container">
+        {/* HEADER */}
 
         <div className="vendor-products-header">
           <div>
@@ -310,18 +509,36 @@ function EditProduct() {
           </Link>
         </div>
 
+        {/* MESSAGES */}
+
         {error && (
-          <div className="auth-error">
+          <div
+            className="auth-error"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
+        {success && (
+          <div
+            className="auth-success"
+            role="status"
+            aria-live="polite"
+          >
+            {success}
+          </div>
+        )}
+
+        {/* FORM */}
+
         <div className="vendor-form-card">
           <form
             onSubmit={handleSubmit}
+            noValidate
           >
-
             <div className="vendor-form-grid">
+              {/* NAME */}
 
               <div className="form-group">
                 <label htmlFor="name">
@@ -336,9 +553,13 @@ function EditProduct() {
                   onChange={
                     handleNameChange
                   }
+                  disabled={saving}
+                  maxLength={255}
                   required
                 />
               </div>
+
+              {/* SKU */}
 
               <div className="form-group">
                 <label htmlFor="sku">
@@ -353,9 +574,13 @@ function EditProduct() {
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
+                  maxLength={100}
                   required
                 />
               </div>
+
+              {/* CATEGORY */}
 
               <div className="form-group">
                 <label htmlFor="category">
@@ -367,15 +592,19 @@ function EditProduct() {
                   name="category"
                   type="number"
                   min="1"
+                  step="1"
                   value={
                     form.category
                   }
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                   required
                 />
               </div>
+
+              {/* BRAND */}
 
               <div className="form-group">
                 <label htmlFor="brand">
@@ -387,13 +616,17 @@ function EditProduct() {
                   name="brand"
                   type="number"
                   min="1"
+                  step="1"
                   value={form.brand}
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                   placeholder="Optional"
                 />
               </div>
+
+              {/* PRICE */}
 
               <div className="form-group">
                 <label htmlFor="price">
@@ -410,9 +643,12 @@ function EditProduct() {
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                   required
                 />
               </div>
+
+              {/* STOCK */}
 
               <div className="form-group">
                 <label htmlFor="stock">
@@ -424,15 +660,18 @@ function EditProduct() {
                   name="stock"
                   type="number"
                   min="0"
+                  step="1"
                   value={form.stock}
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                   required
                 />
               </div>
-
             </div>
+
+            {/* SLUG */}
 
             <div className="form-group">
               <label htmlFor="slug">
@@ -447,9 +686,13 @@ function EditProduct() {
                 onChange={
                   handleChange
                 }
+                disabled={saving}
+                maxLength={255}
                 required
               />
             </div>
+
+            {/* DESCRIPTION */}
 
             <div className="form-group">
               <label htmlFor="description">
@@ -459,18 +702,30 @@ function EditProduct() {
               <textarea
                 id="description"
                 name="description"
-                rows="5"
+                rows="6"
                 value={
                   form.description
                 }
                 onChange={
                   handleChange
                 }
+                disabled={saving}
+                maxLength={5000}
+                required
               />
+
+              <small>
+                {
+                  form.description
+                    .length
+                }
+                /5000 characters
+              </small>
             </div>
 
-            <div className="vendor-form-grid">
+            {/* STATUS + ACTIVE */}
 
+            <div className="vendor-form-grid">
               <div className="form-group">
                 <label htmlFor="status">
                   Status
@@ -479,10 +734,13 @@ function EditProduct() {
                 <select
                   id="status"
                   name="status"
-                  value={form.status}
+                  value={
+                    form.status
+                  }
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                 >
                   <option value="PUBLISHED">
                     Published
@@ -509,17 +767,18 @@ function EditProduct() {
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                 />
 
                 <label htmlFor="is_active">
                   Product is active
                 </label>
               </div>
-
             </div>
 
-            <div className="vendor-form-actions">
+            {/* ACTIONS */}
 
+            <div className="vendor-form-actions">
               <Link
                 to="/vendor/products"
                 className="btn btn-secondary"
@@ -533,12 +792,10 @@ function EditProduct() {
                 disabled={saving}
               >
                 {saving
-                  ? "Saving..."
+                  ? "Saving Changes..."
                   : "Save Changes"}
               </button>
-
             </div>
-
           </form>
         </div>
       </div>

@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -6,9 +10,9 @@ import {
   updateNotificationPreferences,
 } from "../services/notificationService";
 
-
 function Settings() {
-  const [preferences, setPreferences] = useState(null);
+  const [preferences, setPreferences] =
+    useState(null);
 
   const [loadingPreferences, setLoadingPreferences] =
     useState(true);
@@ -18,37 +22,48 @@ function Settings() {
 
   const [error, setError] = useState("");
 
+  const [activeSection, setActiveSection] =
+    useState("general");
+
   const [theme, setTheme] = useState(
-    localStorage.getItem("theme") || "system"
+    localStorage.getItem("theme") ||
+      "system"
   );
 
-  const [language, setLanguage] = useState(
-    localStorage.getItem("language") || "English"
-  );
+  const [language, setLanguage] =
+    useState(
+      localStorage.getItem("language") ||
+        "English"
+    );
 
-  const [currency, setCurrency] = useState(
-    localStorage.getItem("currency") || "INR"
-  );
+  const [currency, setCurrency] =
+    useState(
+      localStorage.getItem("currency") ||
+        "INR"
+    );
 
   const [aiAssistant, setAiAssistant] =
     useState(
-      localStorage.getItem("ai_assistant") !==
-        "false"
-    );
-
-  const [productRecommendations, setProductRecommendations] =
-    useState(
       localStorage.getItem(
-        "product_recommendations"
+        "ai_assistant"
       ) !== "false"
     );
 
+  const [
+    productRecommendations,
+    setProductRecommendations,
+  ] = useState(
+    localStorage.getItem(
+      "product_recommendations"
+    ) !== "false"
+  );
 
-  useEffect(() => {
-    const loadPreferences = async () => {
+  const loadPreferences =
+    useCallback(async () => {
+      setLoadingPreferences(true);
+      setError("");
+
       try {
-        setError("");
-
         const data =
           await getNotificationPreferences();
 
@@ -68,14 +83,58 @@ function Settings() {
       } finally {
         setLoadingPreferences(false);
       }
-    };
-
-    loadPreferences();
-  }, []);
-
+    }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
+    let cancelled = false;
+
+    const fetchPreferences =
+      async () => {
+        setLoadingPreferences(true);
+        setError("");
+
+        try {
+          const data =
+            await getNotificationPreferences();
+
+          if (!cancelled) {
+            setPreferences(data);
+          }
+        } catch (error) {
+          console.error(
+            "SETTINGS PREFERENCES ERROR:",
+            error
+          );
+
+          if (!cancelled) {
+            setError(
+              error.response?.data
+                ?.detail ||
+                error.response?.data
+                  ?.message ||
+                error.message ||
+                "Notification preferences load nahi ho paayi."
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingPreferences(
+              false
+            );
+          }
+        }
+      };
+
+    fetchPreferences();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const root =
+      document.documentElement;
 
     if (theme === "dark") {
       root.setAttribute(
@@ -88,7 +147,9 @@ function Settings() {
         "light"
       );
     } else {
-      root.removeAttribute("data-theme");
+      root.removeAttribute(
+        "data-theme"
+      );
     }
 
     localStorage.setItem(
@@ -96,7 +157,6 @@ function Settings() {
       theme
     );
   }, [theme]);
-
 
   const handleLanguageChange = (
     event
@@ -112,7 +172,6 @@ function Settings() {
     );
   };
 
-
   const handleCurrencyChange = (
     event
   ) => {
@@ -126,7 +185,6 @@ function Settings() {
       value
     );
   };
-
 
   const handleAiAssistantChange = (
     event
@@ -142,244 +200,305 @@ function Settings() {
     );
   };
 
+  const handleProductRecommendationsChange =
+    (event) => {
+      const value =
+        event.target.checked;
 
-  const handleProductRecommendationsChange = (
-    event
-  ) => {
-    const value =
-      event.target.checked;
-
-    setProductRecommendations(
-      value
-    );
-
-    localStorage.setItem(
-      "product_recommendations",
-      String(value)
-    );
-  };
-
-
-  const handlePreferenceChange = async (
-    field,
-    value
-  ) => {
-    if (!preferences) {
-      return;
-    }
-
-    const previousValue =
-      preferences[field];
-
-    setPreferences((current) => ({
-      ...current,
-      [field]: value,
-    }));
-
-    setSavingPreference(field);
-
-    setError("");
-
-    try {
-      const updated =
-        await updateNotificationPreferences({
-          [field]: value,
-        });
-
-      setPreferences(updated);
-    } catch (error) {
-      console.error(
-        "SETTINGS PREFERENCE UPDATE ERROR:",
-        error
+      setProductRecommendations(
+        value
       );
+
+      localStorage.setItem(
+        "product_recommendations",
+        String(value)
+      );
+    };
+
+  const handlePreferenceChange =
+    async (
+      field,
+      value
+    ) => {
+      if (!preferences) {
+        return;
+      }
+
+      const previousValue =
+        preferences[field];
 
       setPreferences((current) => ({
         ...current,
-        [field]: previousValue,
+        [field]: value,
       }));
 
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Preference update nahi ho paayi."
+      setSavingPreference(field);
+      setError("");
+
+      try {
+        const updated =
+          await updateNotificationPreferences(
+            {
+              [field]: value,
+            }
+          );
+
+        setPreferences(updated);
+      } catch (error) {
+        console.error(
+          "SETTINGS PREFERENCE UPDATE ERROR:",
+          error
+        );
+
+        setPreferences(
+          (current) => ({
+            ...current,
+            [field]:
+              previousValue,
+          })
+        );
+
+        setError(
+          error.response?.data
+            ?.detail ||
+            error.response?.data
+              ?.message ||
+            error.message ||
+            "Preference update nahi ho paayi."
+        );
+      } finally {
+        setSavingPreference("");
+      }
+    };
+
+  const scrollToSection = (
+    sectionId
+  ) => {
+    setActiveSection(sectionId);
+
+    const element =
+      document.getElementById(
+        `settings-${sectionId}`
       );
-    } finally {
-      setSavingPreference("");
+
+    if (element) {
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   };
-
 
   if (loadingPreferences) {
     return (
       <main className="settings-page">
-
         <div className="settings-container">
-
-          <div className="products-loading">
+          <div
+            className="products-loading"
+            role="status"
+            aria-live="polite"
+          >
             Loading settings...
           </div>
-
         </div>
-
       </main>
     );
   }
 
-
   return (
     <main className="settings-page">
-
       <div className="settings-container">
-
-
-        {/* HEADER */}
-
         <div className="settings-header">
-
           <span className="settings-label">
             ACCOUNT
           </span>
 
-          <h1>
-            Settings
-          </h1>
+          <h1>Settings</h1>
 
           <p>
-            Manage your account, preferences,
-            notifications and security.
+            Manage your account,
+            preferences, notifications
+            and security.
           </p>
-
         </div>
 
-
-        {/* ERROR */}
-
         {error && (
-          <div className="products-empty">
-
-            <p>
-              {error}
-            </p>
-
-          </div>
-        )}
-
-
-        <div className="settings-layout">
-
-
-          {/* SIDEBAR */}
-
-          <aside className="settings-sidebar">
+          <div
+            className="products-empty"
+            role="alert"
+          >
+            <p>{error}</p>
 
             <button
               type="button"
-              className="settings-nav-item active"
+              className="btn btn-primary"
+              onClick={loadPreferences}
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        <div className="settings-layout">
+          <aside
+            className="settings-sidebar"
+            aria-label="Settings navigation"
+          >
+            <button
+              type="button"
+              className={`settings-nav-item ${
+                activeSection ===
+                "general"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "general"
+                )
+              }
             >
               ⚙️ General
             </button>
 
-
-            <Link
-              to="/profile"
-              className="settings-nav-item"
+            <button
+              type="button"
+              className={`settings-nav-item ${
+                activeSection ===
+                "account"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "account"
+                )
+              }
             >
               👤 Account
-            </Link>
-
+            </button>
 
             <button
               type="button"
-              className="settings-nav-item"
+              className={`settings-nav-item ${
+                activeSection ===
+                "security"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "security"
+                )
+              }
             >
               🔐 Security
             </button>
 
-
             <button
               type="button"
-              className="settings-nav-item"
+              className={`settings-nav-item ${
+                activeSection ===
+                "notifications"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "notifications"
+                )
+              }
             >
               🔔 Notifications
             </button>
 
-
             <button
               type="button"
-              className="settings-nav-item"
+              className={`settings-nav-item ${
+                activeSection ===
+                "appearance"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "appearance"
+                )
+              }
             >
               🎨 Appearance
             </button>
 
-
             <button
               type="button"
-              className="settings-nav-item"
+              className={`settings-nav-item ${
+                activeSection ===
+                "shopping"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection(
+                  "shopping"
+                )
+              }
             >
               🛒 Shopping
             </button>
 
-
             <button
               type="button"
-              className="settings-nav-item"
+              className={`settings-nav-item ${
+                activeSection ===
+                "ai"
+                  ? "active"
+                  : ""
+              }`}
+              onClick={() =>
+                scrollToSection("ai")
+              }
             >
               🤖 AI Preferences
             </button>
-
           </aside>
 
-
-          {/* CONTENT */}
-
           <section className="settings-content">
-
-
-            {/* GENERAL SETTINGS */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-general"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     General Settings
                   </h2>
 
                   <p>
-                    Manage your basic shopping
-                    preferences.
+                    Manage your basic
+                    shopping preferences.
                   </p>
-
                 </div>
-
               </div>
 
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Language
                   </strong>
 
                   <span>
-                    Choose your preferred language.
+                    Choose your preferred
+                    language.
                   </span>
-
                 </div>
-
 
                 <select
                   value={language}
                   onChange={
                     handleLanguageChange
                   }
+                  aria-label="Language"
                 >
-
                   <option value="English">
                     English
                   </option>
@@ -387,34 +506,28 @@ function Settings() {
                   <option value="Hindi">
                     Hindi
                   </option>
-
                 </select>
-
               </div>
 
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Currency
                   </strong>
 
                   <span>
-                    Select your preferred currency.
+                    Select your preferred
+                    currency.
                   </span>
-
                 </div>
-
 
                 <select
                   value={currency}
                   onChange={
                     handleCurrencyChange
                   }
+                  aria-label="Currency"
                 >
-
                   <option value="INR">
                     ₹ INR
                   </option>
@@ -422,51 +535,38 @@ function Settings() {
                   <option value="USD">
                     $ USD
                   </option>
-
                 </select>
-
               </div>
-
             </div>
 
-
-            {/* ACCOUNT */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-account"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     Account
                   </h2>
 
                   <p>
-                    Manage your personal account
-                    information.
+                    Manage your personal
+                    account information.
                   </p>
-
                 </div>
-
               </div>
 
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Profile
                   </strong>
 
                   <span>
-                    View and manage your profile
-                    information.
+                    View and manage your
+                    profile information.
                   </span>
-
                 </div>
-
 
                 <Link
                   to="/profile"
@@ -474,20 +574,15 @@ function Settings() {
                 >
                   View Profile
                 </Link>
-
               </div>
-
             </div>
 
-
-            {/* SECURITY */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-security"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     Security
                   </h2>
@@ -495,26 +590,20 @@ function Settings() {
                   <p>
                     Keep your account secure.
                   </p>
-
                 </div>
-
               </div>
 
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Password
                   </strong>
 
                   <span>
-                    Change your account password.
+                    Change your account
+                    password.
                   </span>
-
                 </div>
-
 
                 <Link
                   to="/change-password"
@@ -522,53 +611,40 @@ function Settings() {
                 >
                   Change Password
                 </Link>
-
               </div>
-
             </div>
 
-
-            {/* NOTIFICATIONS */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-notifications"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     Notifications
                   </h2>
 
                   <p>
-                    Choose which notifications
-                    you want to receive.
+                    Choose which
+                    notifications you want
+                    to receive.
                   </p>
-
                 </div>
-
               </div>
 
-
-              {/* ORDER UPDATES */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     Order Updates
                   </strong>
 
                   <span>
-                    Get updates about your orders.
+                    Get updates about your
+                    orders.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={
@@ -588,31 +664,22 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
 
-
-              {/* PROMOTIONS */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     Promotions
                   </strong>
 
                   <span>
-                    Receive special offers and deals.
+                    Receive special offers
+                    and deals.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={
@@ -632,18 +699,11 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
 
-
-              {/* EMAIL NOTIFICATIONS */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     Email Notifications
                   </strong>
@@ -652,12 +712,9 @@ function Settings() {
                     Receive important updates
                     by email.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={
@@ -677,18 +734,11 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
 
-
-              {/* PUSH NOTIFICATIONS */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     Push Notifications
                   </strong>
@@ -697,12 +747,9 @@ function Settings() {
                     Receive notifications from
                     the store.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={
@@ -722,22 +769,16 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
-
             </div>
 
-
-            {/* APPEARANCE */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-appearance"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     Appearance
                   </h2>
@@ -746,16 +787,11 @@ function Settings() {
                     Customize how the store
                     looks for you.
                   </p>
-
                 </div>
-
               </div>
 
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Theme
                   </strong>
@@ -764,9 +800,7 @@ function Settings() {
                     Choose your preferred
                     appearance.
                   </span>
-
                 </div>
-
 
                 <select
                   value={theme}
@@ -775,8 +809,8 @@ function Settings() {
                       event.target.value
                     )
                   }
+                  aria-label="Theme"
                 >
-
                   <option value="system">
                     System
                   </option>
@@ -788,22 +822,16 @@ function Settings() {
                   <option value="dark">
                     Dark
                   </option>
-
                 </select>
-
               </div>
-
             </div>
 
-
-            {/* SHOPPING */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-shopping"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     Shopping
                   </h2>
@@ -812,18 +840,11 @@ function Settings() {
                     Manage your shopping
                     preferences.
                   </p>
-
                 </div>
-
               </div>
 
-
-              {/* ORDER HISTORY */}
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Order History
                   </strong>
@@ -832,9 +853,7 @@ function Settings() {
                     View your previous orders
                     and purchases.
                   </span>
-
                 </div>
-
 
                 <Link
                   to="/orders"
@@ -842,16 +861,10 @@ function Settings() {
                 >
                   My Orders
                 </Link>
-
               </div>
 
-
-              {/* WISHLIST */}
-
               <div className="settings-option">
-
                 <div>
-
                   <strong>
                     Wishlist
                   </strong>
@@ -860,9 +873,7 @@ function Settings() {
                     View products you have
                     saved.
                   </span>
-
                 </div>
-
 
                 <Link
                   to="/wishlist"
@@ -870,20 +881,15 @@ function Settings() {
                 >
                   My Wishlist
                 </Link>
-
               </div>
-
             </div>
 
-
-            {/* AI PREFERENCES */}
-
-            <div className="settings-card">
-
+            <div
+              id="settings-ai"
+              className="settings-card"
+            >
               <div className="settings-card-heading">
-
                 <div>
-
                   <h2>
                     AI Preferences
                   </h2>
@@ -892,18 +898,11 @@ function Settings() {
                     Control your AI shopping
                     experience.
                   </p>
-
                 </div>
-
               </div>
 
-
-              {/* AI SHOPPING ASSISTANT */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     AI Shopping Assistant
                   </strong>
@@ -912,12 +911,9 @@ function Settings() {
                     Get personalized help
                     while shopping.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={aiAssistant}
@@ -927,18 +923,11 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
 
-
-              {/* PRODUCT RECOMMENDATIONS */}
-
               <div className="settings-toggle">
-
                 <div>
-
                   <strong>
                     Product Recommendations
                   </strong>
@@ -947,12 +936,9 @@ function Settings() {
                     Allow AI to suggest
                     relevant products.
                   </span>
-
                 </div>
 
-
                 <label className="settings-switch">
-
                   <input
                     type="checkbox"
                     checked={
@@ -964,20 +950,12 @@ function Settings() {
                   />
 
                   <span />
-
                 </label>
-
               </div>
-
             </div>
 
-
-            {/* ACCOUNT ACTIONS */}
-
             <div className="settings-card danger-card">
-
               <div>
-
                 <h2>
                   Account Actions
                 </h2>
@@ -986,9 +964,7 @@ function Settings() {
                   Manage important account
                   actions.
                 </p>
-
               </div>
-
 
               <Link
                 to="/profile"
@@ -996,19 +972,12 @@ function Settings() {
               >
                 Manage Account
               </Link>
-
             </div>
-
-
           </section>
-
         </div>
-
       </div>
-
     </main>
   );
 }
-
 
 export default Settings;

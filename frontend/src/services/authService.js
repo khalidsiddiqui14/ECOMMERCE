@@ -1,32 +1,85 @@
 import api from "./api";
 
-export const loginUser = async (email, password) => {
-  const response = await api.post("auth/login/", {
-    email,
-    password,
-  });
+// Login User
+export const loginUser = async (
+  email,
+  password
+) => {
+  const cleanEmail =
+    email?.trim();
+
+  if (!cleanEmail) {
+    throw new Error(
+      "Email is required."
+    );
+  }
+
+  if (!password) {
+    throw new Error(
+      "Password is required."
+    );
+  }
+
+  const response = await api.post(
+    "auth/login/",
+    {
+      email: cleanEmail,
+      password,
+    }
+  );
 
   return response.data;
 };
 
+// Register User
 export const registerUser = async (
   username,
   email,
   password,
   phone
 ) => {
-  const response = await api.post("auth/register/", {
-    username,
-    email,
-    password,
-    phone,
-  });
+  const cleanUsername =
+    username?.trim();
 
-  return response.data;
-};
+  const cleanEmail =
+    email?.trim();
 
-export const getProfile = async () => {
-  const response = await api.get("auth/profile/");
+  const cleanPhone =
+    phone?.trim();
+
+  if (!cleanUsername) {
+    throw new Error(
+      "Username is required."
+    );
+  }
+
+  if (!cleanEmail) {
+    throw new Error(
+      "Email is required."
+    );
+  }
+
+  if (!password) {
+    throw new Error(
+      "Password is required."
+    );
+  }
+
+  if (!cleanPhone) {
+    throw new Error(
+      "Phone is required."
+    );
+  }
+
+  const response = await api.post(
+    "auth/register/",
+    {
+      username: cleanUsername,
+      email: cleanEmail,
+      password,
+      phone: cleanPhone,
+    }
+  );
 
   return response.data;
 };

@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   getNotifications,
@@ -12,78 +17,118 @@ function Notifications() {
   const [loading, setLoading] =
     useState(true);
 
+  const [refreshing, setRefreshing] =
+    useState(false);
+
   const [error, setError] =
     useState("");
 
   const [markingId, setMarkingId] =
     useState(null);
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    setError("");
+  const [markingAll, setMarkingAll] =
+    useState(false);
 
-    try {
-      const data =
-        await getNotifications();
+  const loadNotifications =
+    useCallback(
+      async (isRefresh = false) => {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
-      setNotifications(
-        Array.isArray(data)
-          ? data
-          : data?.results || []
-      );
-    } catch (error) {
-      console.error(
-        "NOTIFICATIONS ERROR:",
-        error
-      );
+        setError("");
 
-      setError(
-        error.response?.data?.detail ||
-          error.message ||
-          "Notifications load nahi ho paayi."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        try {
+          const data =
+            await getNotifications();
+
+          const notificationList =
+            Array.isArray(data)
+              ? data
+              : Array.isArray(data?.results)
+                ? data.results
+                : [];
+
+          setNotifications(
+            notificationList
+          );
+        } catch (error) {
+          console.error(
+            "NOTIFICATIONS ERROR:",
+            error
+          );
+
+          setError(
+            error.response?.data
+              ?.detail ||
+              error.response?.data
+                ?.message ||
+              error.message ||
+              "Notifications load nahi ho paayi."
+          );
+        } finally {
+          if (isRefresh) {
+            setRefreshing(false);
+          } else {
+            setLoading(false);
+          }
+        }
+      },
+      []
+    );
 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchNotifications = async () => {
-      setLoading(true);
-      setError("");
+    const fetchNotifications =
+      async () => {
+        setLoading(true);
+        setError("");
 
-      try {
-        const data =
-          await getNotifications();
+        try {
+          const data =
+            await getNotifications();
 
-        if (!cancelled) {
-          setNotifications(
+          if (cancelled) {
+            return;
+          }
+
+          const notificationList =
             Array.isArray(data)
               ? data
-              : data?.results || []
-          );
-        }
-      } catch (error) {
-        console.error(
-          "NOTIFICATIONS ERROR:",
-          error
-        );
+              : Array.isArray(
+                    data?.results
+                  )
+                ? data.results
+                : [];
 
-        if (!cancelled) {
-          setError(
-            error.response?.data?.detail ||
-              error.message ||
-              "Notifications load nahi ho paayi."
+          setNotifications(
+            notificationList
           );
+        } catch (error) {
+          console.error(
+            "NOTIFICATIONS ERROR:",
+            error
+          );
+
+          if (!cancelled) {
+            setError(
+              error.response?.data
+                ?.detail ||
+                error.response?.data
+                  ?.message ||
+                error.message ||
+                "Notifications load nahi ho paayi."
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
         }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
+      };
 
     fetchNotifications();
 
@@ -92,85 +137,207 @@ function Notifications() {
     };
   }, []);
 
-  const handleMarkRead = async (
-    notification
-  ) => {
-    if (
-      notification.is_read ||
-      markingId === notification.id
-    ) {
-      return;
-    }
-
-    setMarkingId(notification.id);
-    setError("");
-
-    try {
-      const updated =
-        await markNotificationRead(
-          notification.id
-        );
-
-      setNotifications(
-        (previous) =>
-          previous.map((item) =>
-            item.id === notification.id
-              ? {
-                  ...item,
-                  ...updated,
-                  is_read: true,
-                }
-              : item
-          )
-      );
-    } catch (error) {
-      console.error(
-        "MARK NOTIFICATION READ ERROR:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          "Notification read mark nahi ho paayi."
-      );
-    } finally {
-      setMarkingId(null);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    const unread =
+  const unreadCount = useMemo(
+    () =>
       notifications.filter(
         (notification) =>
           !notification.is_read
-      );
+      ).length,
+    [notifications]
+  );
 
-    for (const notification of unread) {
+  const handleMarkRead =
+    async (notification) => {
+      if (
+        !notification?.id ||
+        notification.is_read ||
+        markingId === notification.id ||
+        markingAll
+      ) {
+        return;
+      }
+
+      setMarkingId(notification.id);
+      setError("");
+
       try {
-        await markNotificationRead(
-          notification.id
+        const updated =
+          await markNotificationRead(
+            notification.id
+          );
+
+        setNotifications(
+          (previous) =>
+            previous.map((item) =>
+              item.id ===
+              notification.id
+                ? {
+                    ...item,
+                    ...updated,
+                    is_read: true,
+                  }
+                : item
+            )
         );
+      } catch (error) {
+        console.error(
+          "MARK NOTIFICATION READ ERROR:",
+          error
+        );
+
+        setError(
+          error.response?.data
+            ?.detail ||
+            error.response?.data
+              ?.message ||
+            "Notification read mark nahi ho paayi."
+        );
+      } finally {
+        setMarkingId(null);
+      }
+    };
+
+  const handleMarkAllRead =
+    async () => {
+      const unreadNotifications =
+        notifications.filter(
+          (notification) =>
+            !notification.is_read
+        );
+
+      if (
+        unreadNotifications.length ===
+        0
+      ) {
+        return;
+      }
+
+      setMarkingAll(true);
+      setError("");
+
+      try {
+        const results =
+          await Promise.allSettled(
+            unreadNotifications.map(
+              (notification) =>
+                markNotificationRead(
+                  notification.id
+                )
+            )
+          );
+
+        const successfulIds =
+          new Set();
+
+        results.forEach(
+          (result, index) => {
+            if (
+              result.status ===
+              "fulfilled"
+            ) {
+              successfulIds.add(
+                unreadNotifications[
+                  index
+                ].id
+              );
+            }
+          }
+        );
+
+        setNotifications(
+          (previous) =>
+            previous.map(
+              (notification) =>
+                successfulIds.has(
+                  notification.id
+                )
+                  ? {
+                      ...notification,
+                      is_read: true,
+                    }
+                  : notification
+            )
+        );
+
+        if (
+          successfulIds.size !==
+          unreadNotifications.length
+        ) {
+          setError(
+            "Some notifications could not be marked as read. Please try again."
+          );
+        }
       } catch (error) {
         console.error(
           "MARK ALL READ ERROR:",
           error
         );
+
+        setError(
+          "Notifications mark as read nahi ho paayi."
+        );
+      } finally {
+        setMarkingAll(false);
       }
+    };
+
+  const getNotificationIcon =
+    (type) => {
+      switch (
+        type?.toLowerCase()
+      ) {
+        case "success":
+          return "✓";
+
+        case "warning":
+          return "!";
+
+        case "error":
+          return "×";
+
+        case "info":
+          return "🚚";
+
+        default:
+          return "🔔";
+      }
+    };
+
+  const formatDate = (
+    createdAt
+  ) => {
+    if (!createdAt) {
+      return "";
     }
 
-    setNotifications(
-      (previous) =>
-        previous.map((notification) => ({
-          ...notification,
-          is_read: true,
-        }))
+    const date = new Date(
+      createdAt
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return date.toLocaleString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
     );
   };
 
   if (loading) {
     return (
       <main className="notifications-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading notifications...
         </div>
       </main>
@@ -182,37 +349,63 @@ function Notifications() {
       <div className="notifications-container">
         <div className="notifications-header">
           <div>
-            <h1>Notifications</h1>
+            <h1>
+              Notifications
+            </h1>
 
             <p>
-              Stay updated with your
-              account and orders.
+              {unreadCount > 0
+                ? `${unreadCount} unread notification${
+                    unreadCount === 1
+                      ? ""
+                      : "s"
+                  }.`
+                : "You're all caught up."}
             </p>
           </div>
 
-          {notifications.some(
-            (notification) =>
-              !notification.is_read
-          ) && (
+          <div className="notification-header-actions">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                className="mark-read-button"
+                onClick={
+                  handleMarkAllRead
+                }
+                disabled={markingAll}
+              >
+                {markingAll
+                  ? "Marking..."
+                  : "Mark all as read"}
+              </button>
+            )}
+
             <button
               type="button"
               className="mark-read-button"
-              onClick={
-                handleMarkAllRead
+              onClick={() =>
+                loadNotifications(true)
               }
+              disabled={refreshing}
             >
-              Mark all as read
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
             </button>
-          )}
+          </div>
         </div>
 
         {error && (
-          <div className="auth-error">
+          <div
+            className="auth-error"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
-        {notifications.length === 0 ? (
+        {notifications.length ===
+        0 ? (
           <div className="products-empty">
             <h2>
               No Notifications
@@ -226,11 +419,16 @@ function Notifications() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={
-                loadNotifications
+              onClick={() =>
+                loadNotifications(
+                  true
+                )
               }
+              disabled={refreshing}
             >
-              Refresh
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
             </button>
           </div>
         ) : (
@@ -238,42 +436,36 @@ function Notifications() {
             {notifications.map(
               (notification) => {
                 const type =
-                  notification.type ||
-                  "info";
+                  (
+                    notification.type ||
+                    "info"
+                  ).toLowerCase();
+
+                const isUnread =
+                  !notification.is_read;
+
+                const isMarking =
+                  markingId ===
+                  notification.id;
 
                 return (
-                  <div
+                  <article
                     className={`notification-card notification-${type} ${
-                      notification.is_read
-                        ? "notification-read"
-                        : "notification-unread"
+                      isUnread
+                        ? "notification-unread"
+                        : "notification-read"
                     }`}
                     key={
                       notification.id
                     }
-                    onClick={() =>
-                      handleMarkRead(
-                        notification
-                      )
-                    }
                   >
-                    <div className="notification-icon">
-                      {type ===
-                        "success" && "✓"}
-
-                      {type ===
-                        "info" && "🚚"}
-
-                      {type ===
-                        "warning" && "!"}
-
-                      {![
-                        "success",
-                        "info",
-                        "warning",
-                      ].includes(
+                    <div
+                      className="notification-icon"
+                      aria-hidden="true"
+                    >
+                      {getNotificationIcon(
                         type
-                      ) && "🔔"}
+                      )}
                     </div>
 
                     <div className="notification-content">
@@ -284,46 +476,43 @@ function Notifications() {
 
                       <p>
                         {notification.message ||
-                          ""}
+                          "You have a new notification."}
                       </p>
 
-                      <span>
-                        {notification.created_at
-                          ? new Date(
-                              notification.created_at
-                            ).toLocaleString(
-                              "en-IN"
-                            )
-                          : ""}
-                      </span>
+                      {notification.created_at && (
+                        <time
+                          dateTime={
+                            notification.created_at
+                          }
+                        >
+                          {formatDate(
+                            notification.created_at
+                          )}
+                        </time>
+                      )}
                     </div>
 
-                    {!notification.is_read && (
+                    {isUnread && (
                       <div className="notification-actions">
                         <button
                           type="button"
-                          onClick={(
-                            event
-                          ) => {
-                            event.stopPropagation();
-
+                          onClick={() =>
                             handleMarkRead(
                               notification
-                            );
-                          }}
+                            )
+                          }
                           disabled={
-                            markingId ===
-                            notification.id
+                            isMarking ||
+                            markingAll
                           }
                         >
-                          {markingId ===
-                          notification.id
+                          {isMarking
                             ? "Saving..."
                             : "Mark as read"}
                         </button>
                       </div>
                     )}
-                  </div>
+                  </article>
                 );
               }
             )}

@@ -1,32 +1,35 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import {
-  getVendorDashboard,
-} from "../../services/vendorService";
+import { getVendorDashboard } from "../../services/vendorService";
 
 function VendorDashboard() {
-  const [dashboard, setDashboard] =
-    useState(null);
+  const [dashboard, setDashboard] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const loadDashboard = async () => {
+  const loadDashboard = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError("");
+
       try {
-        const data =
-          await getVendorDashboard();
+        const data = await getVendorDashboard();
 
         console.log(
           "VENDOR DASHBOARD:",
           data
         );
 
-        setDashboard(data);
+        setDashboard(data || {});
       } catch (error) {
         console.error(
           "VENDOR DASHBOARD ERROR:",
@@ -35,28 +38,131 @@ function VendorDashboard() {
 
         setError(
           error.response?.data?.detail ||
+            error.response?.data?.message ||
             error.message ||
             "Dashboard load nahi ho paaya."
         );
       } finally {
-        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDashboard = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await getVendorDashboard();
+
+        if (!cancelled) {
+          setDashboard(data || {});
+        }
+      } catch (error) {
+        console.error(
+          "VENDOR DASHBOARD ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.response?.data?.message ||
+              error.message ||
+              "Dashboard load nahi ho paaya."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadDashboard();
+    fetchDashboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const stats = dashboard?.stats || {};
+
+  const recentOrders = Array.isArray(
+    dashboard?.recent_orders
+  )
+    ? dashboard.recent_orders
+    : [];
+
+  const storeName =
+    dashboard?.store?.name ||
+    "Your Store";
+
+  const totalProducts = Number(
+    stats.total_products || 0
+  );
+
+  const totalOrders = Number(
+    stats.total_orders || 0
+  );
+
+  const pendingOrders = Number(
+    stats.pending_orders || 0
+  );
+
+  const revenue = Number(
+    stats.revenue || 0
+  );
+
+  const formatCurrency = (value) =>
+    `₹${Number(value || 0).toLocaleString(
+      "en-IN"
+    )}`;
+
+  const formatDate = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return date.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
+  };
 
   if (loading) {
     return (
       <main className="vendor-dashboard-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading dashboard...
         </div>
       </main>
     );
   }
 
-  if (error) {
+  if (error && !dashboard) {
     return (
       <main className="vendor-dashboard-page">
         <div className="products-empty">
@@ -65,29 +171,26 @@ function VendorDashboard() {
           <p>{error}</p>
 
           <button
+            type="button"
             className="btn btn-primary"
             onClick={() =>
-              window.location.reload()
+              loadDashboard(true)
             }
+            disabled={refreshing}
           >
-            Try Again
+            {refreshing
+              ? "Retrying..."
+              : "Try Again"}
           </button>
         </div>
       </main>
     );
   }
 
-  const stats =
-    dashboard?.stats || {};
-
-  const recentOrders =
-    dashboard?.recent_orders || [];
-
   return (
     <main className="vendor-dashboard-page">
       <div className="vendor-dashboard-container">
-
-        {/* Header */}
+        {/* HEADER */}
 
         <div className="vendor-dashboard-header">
           <div>
@@ -96,31 +199,60 @@ function VendorDashboard() {
             </span>
 
             <h1>
-              Welcome to{" "}
-              {dashboard?.store?.name ||
-                "Your Store"}
+              Welcome to {storeName}
             </h1>
 
             <p>
-              Manage your store, products and
-              orders from one place.
+              Manage your store, products
+              and orders from one place.
             </p>
           </div>
 
-          <Link
-            to="/vendor/products"
-            className="btn btn-primary"
-          >
-            Manage Products
-          </Link>
+          <div className="vendor-dashboard-header-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                loadDashboard(true)
+              }
+              disabled={refreshing}
+            >
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+
+            <Link
+              to="/vendor/products"
+              className="btn btn-primary"
+            >
+              Manage Products
+            </Link>
+          </div>
         </div>
 
-        {/* Stats */}
+        {/* ERROR */}
 
-        <section className="vendor-stats-grid">
+        {error && (
+          <div
+            className="auth-error"
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
 
+        {/* STATS */}
+
+        <section
+          className="vendor-stats-grid"
+          aria-label="Store statistics"
+        >
           <div className="vendor-stat-card">
-            <div className="vendor-stat-icon">
+            <div
+              className="vendor-stat-icon"
+              aria-hidden="true"
+            >
               📦
             </div>
 
@@ -130,13 +262,16 @@ function VendorDashboard() {
               </span>
 
               <strong>
-                {stats.total_products || 0}
+                {totalProducts}
               </strong>
             </div>
           </div>
 
           <div className="vendor-stat-card">
-            <div className="vendor-stat-icon">
+            <div
+              className="vendor-stat-icon"
+              aria-hidden="true"
+            >
               🛒
             </div>
 
@@ -146,13 +281,16 @@ function VendorDashboard() {
               </span>
 
               <strong>
-                {stats.total_orders || 0}
+                {totalOrders}
               </strong>
             </div>
           </div>
 
           <div className="vendor-stat-card">
-            <div className="vendor-stat-icon">
+            <div
+              className="vendor-stat-icon"
+              aria-hidden="true"
+            >
               ⏳
             </div>
 
@@ -162,13 +300,16 @@ function VendorDashboard() {
               </span>
 
               <strong>
-                {stats.pending_orders || 0}
+                {pendingOrders}
               </strong>
             </div>
           </div>
 
           <div className="vendor-stat-card">
-            <div className="vendor-stat-icon">
+            <div
+              className="vendor-stat-icon"
+              aria-hidden="true"
+            >
               💰
             </div>
 
@@ -178,24 +319,20 @@ function VendorDashboard() {
               </span>
 
               <strong>
-                ₹
-                {Number(
-                  stats.revenue || 0
-                ).toLocaleString(
-                  "en-IN"
+                {formatCurrency(
+                  revenue
                 )}
               </strong>
             </div>
           </div>
-
         </section>
 
-        {/* Dashboard Content */}
+        {/* DASHBOARD CONTENT */}
 
         <section className="vendor-dashboard-content">
+          {/* RECENT ORDERS */}
 
           <div className="vendor-orders-section">
-
             <div className="vendor-section-header">
               <div>
                 <h2>
@@ -216,9 +353,12 @@ function VendorDashboard() {
               </Link>
             </div>
 
-            {recentOrders.length === 0 ? (
+            {recentOrders.length ===
+            0 ? (
               <div className="vendor-empty">
-                <div>
+                <div
+                  aria-hidden="true"
+                >
                   📦
                 </div>
 
@@ -228,141 +368,165 @@ function VendorDashboard() {
 
                 <p>
                   Orders containing your
-                  products will appear here.
+                  products will appear
+                  here.
                 </p>
+
+                <Link
+                  to="/vendor/products"
+                  className="btn btn-primary"
+                >
+                  Manage Products
+                </Link>
               </div>
             ) : (
               <div className="vendor-orders-list">
-
                 {recentOrders.map(
-                  (order) => (
-                    <div
-                      className="vendor-order-card"
-                      key={order.id}
-                    >
+                  (order) => {
+                    const items =
+                      Array.isArray(
+                        order?.items
+                      )
+                        ? order.items
+                        : [];
 
-                      <div className="vendor-order-header">
+                    return (
+                      <article
+                        className="vendor-order-card"
+                        key={
+                          order.id
+                        }
+                      >
+                        <div className="vendor-order-header">
+                          <div>
+                            <span>
+                              Order Number
+                            </span>
 
-                        <div>
-                          <span>
-                            Order Number
+                            <strong>
+                              {order.order_number ||
+                                `#${order.id}`}
+                            </strong>
+                          </div>
+
+                          <span className="vendor-order-status">
+                            {order.status ||
+                              "PLACED"}
                           </span>
-
-                          <strong>
-                            {order.order_number}
-                          </strong>
                         </div>
 
-                        <span className="vendor-order-status">
-                          {order.status}
-                        </span>
-
-                      </div>
-
-                      <div className="vendor-order-items">
-
-                        {order.items?.map(
-                          (item) => (
-                            <div
-                              className="vendor-order-item"
-                              key={item.id}
-                            >
-
-                              <div className="vendor-product-icon">
-                                📦
-                              </div>
-
-                              <div>
-                                <strong>
-                                  {
-                                    item.product_name
+                        <div className="vendor-order-items">
+                          {items.length ===
+                          0 ? (
+                            <span>
+                              No item details
+                              available.
+                            </span>
+                          ) : (
+                            items.map(
+                              (item) => (
+                                <div
+                                  className="vendor-order-item"
+                                  key={
+                                    item.id
                                   }
-                                </strong>
+                                >
+                                  <div
+                                    className="vendor-product-icon"
+                                    aria-hidden="true"
+                                  >
+                                    📦
+                                  </div>
 
-                                <span>
-                                  SKU:{" "}
-                                  {item.sku}
-                                </span>
+                                  <div>
+                                    <strong>
+                                      {item.product_name ||
+                                        item.product?.name ||
+                                        `Product #${item.product || "-"}`}
+                                    </strong>
 
-                                <span>
-                                  Qty:{" "}
-                                  {item.quantity}
-                                </span>
-                              </div>
+                                    <span>
+                                      SKU:{" "}
+                                      {item.sku ||
+                                        "-"}
+                                    </span>
 
-                              <strong>
-                                ₹
-                                {Number(
-                                  item.total_price
-                                ).toLocaleString(
-                                  "en-IN"
-                                )}
-                              </strong>
+                                    <span>
+                                      Qty:{" "}
+                                      {Number(
+                                        item.quantity ||
+                                          0
+                                      )}
+                                    </span>
+                                  </div>
 
-                            </div>
-                          )
-                        )}
-
-                      </div>
-
-                      <div className="vendor-order-footer">
-
-                        <div>
-                          <span>
-                            Payment
-                          </span>
-
-                          <strong>
-                            {
-                              order.payment_status
-                            }
-                          </strong>
+                                  <strong>
+                                    {formatCurrency(
+                                      item.total_price
+                                    )}
+                                  </strong>
+                                </div>
+                              )
+                            )
+                          )}
                         </div>
 
-                        <div>
-                          <span>
-                            Order Total
-                          </span>
+                        <div className="vendor-order-footer">
+                          <div>
+                            <span>
+                              Payment
+                            </span>
 
-                          <strong>
-                            ₹
-                            {Number(
-                              order.total_amount
-                            ).toLocaleString(
-                              "en-IN"
-                            )}
-                          </strong>
+                            <strong>
+                              {order.payment_status ||
+                                "-"}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              Order Total
+                            </span>
+
+                            <strong>
+                              {formatCurrency(
+                                order.total_amount
+                              )}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              Date
+                            </span>
+
+                            <strong>
+                              {formatDate(
+                                order.created_at
+                              )}
+                            </strong>
+                          </div>
                         </div>
 
-                        <div>
-                          <span>
-                            Date
-                          </span>
-
-                          <strong>
-                            {new Date(
-                              order.created_at
-                            ).toLocaleDateString(
-                              "en-IN"
-                            )}
-                          </strong>
+                        <div className="vendor-order-footer">
+                          <Link
+                            to={`/orders/${order.id}`}
+                            className="back-link"
+                          >
+                            View Order →
+                          </Link>
                         </div>
-
-                      </div>
-
-                    </div>
-                  )
+                      </article>
+                    );
+                  }
                 )}
-
               </div>
             )}
-
           </div>
 
-          {/* Quick Actions */}
+          {/* QUICK ACTIONS */}
 
           <aside className="vendor-quick-actions">
-
             <h2>
               Quick Actions
             </h2>
@@ -371,7 +535,7 @@ function VendorDashboard() {
               to="/vendor/products"
               className="vendor-action-card"
             >
-              <span>
+              <span aria-hidden="true">
                 📦
               </span>
 
@@ -387,10 +551,29 @@ function VendorDashboard() {
             </Link>
 
             <Link
+              to="/vendor/products/create"
+              className="vendor-action-card"
+            >
+              <span aria-hidden="true">
+                ➕
+              </span>
+
+              <div>
+                <strong>
+                  Add Product
+                </strong>
+
+                <small>
+                  Create a new product
+                </small>
+              </div>
+            </Link>
+
+            <Link
               to="/vendor/orders"
               className="vendor-action-card"
             >
-              <span>
+              <span aria-hidden="true">
                 🛒
               </span>
 
@@ -409,7 +592,7 @@ function VendorDashboard() {
               to="/vendor/store"
               className="vendor-action-card"
             >
-              <span>
+              <span aria-hidden="true">
                 🏪
               </span>
 
@@ -428,7 +611,7 @@ function VendorDashboard() {
               to="/vendor/profile"
               className="vendor-action-card"
             >
-              <span>
+              <span aria-hidden="true">
                 👤
               </span>
 
@@ -442,11 +625,8 @@ function VendorDashboard() {
                 </small>
               </div>
             </Link>
-
           </aside>
-
         </section>
-
       </div>
     </main>
   );

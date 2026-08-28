@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useState,
 } from "react";
@@ -8,26 +9,78 @@ import {
   updateVendorProfile,
 } from "../../services/vendorService";
 
+const INITIAL_PROFILE = {
+  username: "",
+  email: "",
+  phone: "",
+  role: "VENDOR",
+  business_name: "",
+  gst_number: "",
+  address: "",
+  city: "",
+  state: "",
+  country: "India",
+  postal_code: "",
+  is_verified: false,
+  is_active: true,
+};
+
+function normalizeProfile(data) {
+  return {
+    ...INITIAL_PROFILE,
+    ...(data || {}),
+    username:
+      data?.username ||
+      data?.user ||
+      "",
+    email:
+      data?.email ||
+      "",
+    role:
+      data?.role ||
+      "VENDOR",
+    business_name:
+      data?.business_name ||
+      "",
+    gst_number:
+      data?.gst_number ||
+      "",
+    phone:
+      data?.phone ||
+      "",
+    address:
+      data?.address ||
+      "",
+    city:
+      data?.city ||
+      "",
+    state:
+      data?.state ||
+      "",
+    country:
+      data?.country ||
+      "India",
+    postal_code:
+      data?.postal_code ||
+      "",
+    is_verified:
+      Boolean(
+        data?.is_verified
+      ),
+    is_active:
+      data?.is_active !== false,
+  };
+}
+
 function VendorProfile() {
   const [profile, setProfile] =
-    useState({
-      username: "",
-      email: "",
-      phone: "",
-      role: "",
-      business_name: "",
-      gst_number: "",
-      address: "",
-      city: "",
-      state: "",
-      country: "",
-      postal_code: "",
-      is_verified: false,
-      is_active: true,
-    });
+    useState(INITIAL_PROFILE);
 
   const [loading, setLoading] =
     useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
 
   const [saving, setSaving] =
     useState(false);
@@ -38,74 +91,64 @@ function VendorProfile() {
   const [success, setSuccess] =
     useState("");
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
+  const loadProfile = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       setError("");
       setSuccess("");
 
-      const data =
-        await getVendorProfile();
+      try {
+        const data =
+          await getVendorProfile();
 
-      setProfile((previous) => ({
-        ...previous,
-        ...data,
-        username:
-          data.username ||
-          data.user ||
-          "",
-        email:
-          data.email ||
-          "",
-        role:
-          data.role ||
-          "VENDOR",
-      }));
-    } catch (error) {
-      console.error(
-        "VENDOR PROFILE ERROR:",
-        error
-      );
+        setProfile(
+          normalizeProfile(data)
+        );
+      } catch (error) {
+        console.error(
+          "VENDOR PROFILE ERROR:",
+          error
+        );
 
-      setError(
-        error.response?.data?.detail ||
-          error.message ||
-          "Vendor profile load nahi ho paaya."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        setError(
+          error.response?.data
+            ?.detail ||
+            error.response?.data
+              ?.message ||
+            error.message ||
+            "Vendor profile load nahi ho paaya."
+        );
+      } finally {
+        if (isRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchProfile = async () => {
-      try {
-        if (!cancelled) {
-          setLoading(true);
-          setError("");
-          setSuccess("");
-        }
+      setLoading(true);
+      setError("");
 
+      try {
         const data =
           await getVendorProfile();
 
         if (!cancelled) {
-          setProfile((previous) => ({
-            ...previous,
-            ...data,
-            username:
-              data.username ||
-              data.user ||
-              "",
-            email:
-              data.email ||
-              "",
-            role:
-              data.role ||
-              "VENDOR",
-          }));
+          setProfile(
+            normalizeProfile(data)
+          );
         }
       } catch (error) {
         console.error(
@@ -115,7 +158,10 @@ function VendorProfile() {
 
         if (!cancelled) {
           setError(
-            error.response?.data?.detail ||
+            error.response?.data
+              ?.detail ||
+              error.response?.data
+                ?.message ||
               error.message ||
               "Vendor profile load nahi ho paaya."
           );
@@ -146,6 +192,151 @@ function VendorProfile() {
       ...previous,
       [name]: value,
     }));
+
+    setError("");
+    setSuccess("");
+  };
+
+  const validateProfile = () => {
+    const businessName =
+      profile.business_name.trim();
+
+    const phone =
+      profile.phone.trim();
+
+    const gstNumber =
+      profile.gst_number.trim();
+
+    const address =
+      profile.address.trim();
+
+    const city =
+      profile.city.trim();
+
+    const state =
+      profile.state.trim();
+
+    const country =
+      profile.country.trim();
+
+    const postalCode =
+      profile.postal_code.trim();
+
+    if (!businessName) {
+      return "Business name is required.";
+    }
+
+    if (!phone) {
+      return "Phone number is required.";
+    }
+
+    if (
+      !/^[0-9+\-\s()]{7,20}$/.test(
+        phone
+      )
+    ) {
+      return "Please enter a valid phone number.";
+    }
+
+    if (
+      gstNumber &&
+      !/^[0-9A-Z]{15}$/i.test(
+        gstNumber
+      )
+    ) {
+      return "GST number must contain 15 characters.";
+    }
+
+    if (!address) {
+      return "Address is required.";
+    }
+
+    if (!city) {
+      return "City is required.";
+    }
+
+    if (!state) {
+      return "State is required.";
+    }
+
+    if (!country) {
+      return "Country is required.";
+    }
+
+    if (!postalCode) {
+      return "Postal code is required.";
+    }
+
+    if (
+      !/^[A-Za-z0-9\s-]{3,12}$/.test(
+        postalCode
+      )
+    ) {
+      return "Please enter a valid postal code.";
+    }
+
+    return "";
+  };
+
+  const formatApiError = (
+    error
+  ) => {
+    const data =
+      error.response?.data;
+
+    if (!data) {
+      return (
+        error.message ||
+        "Vendor profile update nahi ho paaya."
+      );
+    }
+
+    if (
+      typeof data === "string"
+    ) {
+      return data;
+    }
+
+    if (data.detail) {
+      return Array.isArray(
+        data.detail
+      )
+        ? data.detail.join(", ")
+        : String(data.detail);
+    }
+
+    if (data.message) {
+      return Array.isArray(
+        data.message
+      )
+        ? data.message.join(", ")
+        : String(data.message);
+    }
+
+    const messages =
+      Object.entries(data)
+        .map(
+          ([field, message]) => {
+            const text =
+              Array.isArray(message)
+                ? message.join(", ")
+                : typeof message ===
+                    "object" &&
+                  message !== null
+                ? JSON.stringify(
+                    message
+                  )
+                : String(message);
+
+            return `${field}: ${text}`;
+          }
+        )
+        .join(" | ");
+
+    return (
+      messages ||
+      "Vendor profile update nahi ho paaya."
+    );
   };
 
   const handleSubmit = async (
@@ -155,6 +346,17 @@ function VendorProfile() {
 
     setError("");
     setSuccess("");
+
+    const validationError =
+      validateProfile();
+
+    if (validationError) {
+      setError(
+        validationError
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -190,16 +392,22 @@ function VendorProfile() {
           profileData
         );
 
-      setProfile((previous) => ({
-        ...previous,
-        ...data,
-        username:
-          previous.username,
-        email:
-          previous.email,
-        role:
-          previous.role,
-      }));
+      setProfile(
+        normalizeProfile({
+          ...profile,
+          ...data,
+          username:
+            profile.username,
+          email:
+            profile.email,
+          role:
+            profile.role,
+          is_verified:
+            profile.is_verified,
+          is_active:
+            profile.is_active,
+        })
+      );
 
       setSuccess(
         "Vendor profile updated successfully."
@@ -210,45 +418,33 @@ function VendorProfile() {
         error
       );
 
-      const responseData =
-        error.response?.data;
-
-      if (responseData) {
-        const messages =
-          Object.entries(
-            responseData
-          )
-            .map(
-              ([field, message]) => {
-                const text =
-                  Array.isArray(message)
-                    ? message.join(", ")
-                    : message;
-
-                return `${field}: ${text}`;
-              }
-            )
-            .join(" | ");
-
-        setError(
-          messages ||
-            "Vendor profile update nahi ho paaya."
-        );
-      } else {
-        setError(
-          "Vendor profile update nahi ho paaya."
-        );
-      }
+      setError(
+        formatApiError(error)
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  const avatarName =
+    profile.username ||
+    profile.business_name ||
+    "Vendor";
+
+  const avatarLetter =
+    avatarName
+      .charAt(0)
+      .toUpperCase();
+
   if (loading) {
     return (
       <main className="vendor-profile-page">
         <div className="vendor-container">
-          <div className="products-loading">
+          <div
+            className="products-loading"
+            role="status"
+            aria-live="polite"
+          >
             Loading profile...
           </div>
         </div>
@@ -260,16 +456,11 @@ function VendorProfile() {
     <main className="vendor-profile-page">
       <div className="vendor-container">
 
-        <div className="vendor-profile-header">
+        {/* HEADER */}
 
+        <div className="vendor-profile-header">
           <div className="vendor-profile-avatar">
-            {(
-              profile.username ||
-              profile.business_name ||
-              "V"
-            )
-              .charAt(0)
-              .toUpperCase()}
+            {avatarLetter}
           </div>
 
           <div>
@@ -287,39 +478,57 @@ function VendorProfile() {
             </p>
           </div>
 
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() =>
+              loadProfile(true)
+            }
+            disabled={
+              refreshing ||
+              saving
+            }
+          >
+            {refreshing
+              ? "Refreshing..."
+              : "Refresh"}
+          </button>
         </div>
 
-        {error && (
-          <div className="auth-error">
-            {error}
+        {/* ERROR */}
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={loadProfile}
-              style={{
-                marginLeft: "10px",
-              }}
-            >
-              Try Again
-            </button>
+        {error && (
+          <div
+            className="auth-error"
+            role="alert"
+          >
+            {error}
           </div>
         )}
 
+        {/* SUCCESS */}
+
         {success && (
-          <div className="auth-success">
+          <div
+            className="auth-success"
+            role="status"
+            aria-live="polite"
+          >
             {success}
           </div>
         )}
 
-        <section className="vendor-profile-card">
+        {/* PROFILE FORM */}
 
+        <section className="vendor-profile-card">
           <form
             onSubmit={handleSubmit}
+            noValidate
           >
 
-            <div className="vendor-profile-section">
+            {/* ACCOUNT INFORMATION */}
 
+            <div className="vendor-profile-section">
               <h2>
                 Account Information
               </h2>
@@ -340,6 +549,11 @@ function VendorProfile() {
                     }
                     readOnly
                   />
+
+                  <small>
+                    Username cannot be
+                    changed here.
+                  </small>
                 </div>
 
                 <div className="form-group">
@@ -356,6 +570,11 @@ function VendorProfile() {
                     }
                     readOnly
                   />
+
+                  <small>
+                    Email cannot be
+                    changed here.
+                  </small>
                 </div>
 
                 <div className="form-group">
@@ -373,6 +592,8 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
+                    maxLength={20}
                     required
                   />
                 </div>
@@ -394,11 +615,11 @@ function VendorProfile() {
                 </div>
 
               </div>
-
             </div>
 
-            <div className="vendor-profile-section">
+            {/* BUSINESS INFORMATION */}
 
+            <div className="vendor-profile-section">
               <h2>
                 Business Information
               </h2>
@@ -406,7 +627,6 @@ function VendorProfile() {
               <div className="vendor-profile-grid">
 
                 <div className="form-group">
-
                   <label htmlFor="business_name">
                     Business Name
                   </label>
@@ -421,13 +641,13 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
+                    maxLength={255}
                     required
                   />
-
                 </div>
 
                 <div className="form-group">
-
                   <label htmlFor="gst_number">
                     GST Number
                   </label>
@@ -442,22 +662,32 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
+                    maxLength={15}
+                    style={{
+                      textTransform:
+                        "uppercase",
+                    }}
+                    placeholder="Optional"
                   />
 
+                  <small>
+                    Example:
+                    22AAAAA0000A1Z5
+                  </small>
                 </div>
 
               </div>
-
             </div>
 
-            <div className="vendor-profile-section">
+            {/* ADDRESS */}
 
+            <div className="vendor-profile-section">
               <h2>
                 Address
               </h2>
 
               <div className="form-group">
-
                 <label htmlFor="address">
                   Address
                 </label>
@@ -472,15 +702,14 @@ function VendorProfile() {
                   onChange={
                     handleChange
                   }
+                  disabled={saving}
                   required
                 />
-
               </div>
 
               <div className="vendor-profile-grid">
 
                 <div className="form-group">
-
                   <label htmlFor="city">
                     City
                   </label>
@@ -495,13 +724,12 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
                     required
                   />
-
                 </div>
 
                 <div className="form-group">
-
                   <label htmlFor="state">
                     State
                   </label>
@@ -516,13 +744,12 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
                     required
                   />
-
                 </div>
 
                 <div className="form-group">
-
                   <label htmlFor="country">
                     Country
                   </label>
@@ -537,13 +764,12 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
                     required
                   />
-
                 </div>
 
                 <div className="form-group">
-
                   <label htmlFor="postal_code">
                     Postal Code
                   </label>
@@ -558,14 +784,16 @@ function VendorProfile() {
                     onChange={
                       handleChange
                     }
+                    disabled={saving}
+                    maxLength={12}
                     required
                   />
-
                 </div>
 
               </div>
-
             </div>
+
+            {/* ACCOUNT STATUS */}
 
             <div className="vendor-account-status">
 
@@ -574,7 +802,13 @@ function VendorProfile() {
                   Account Status
                 </span>
 
-                <strong>
+                <strong
+                  className={
+                    profile.is_active
+                      ? "status-active"
+                      : "status-inactive"
+                  }
+                >
                   {profile.is_active
                     ? "Active"
                     : "Inactive"}
@@ -586,7 +820,13 @@ function VendorProfile() {
                   Vendor Status
                 </span>
 
-                <strong>
+                <strong
+                  className={
+                    profile.is_verified
+                      ? "status-verified"
+                      : "status-pending"
+                  }
+                >
                   {profile.is_verified
                     ? "Verified"
                     : "Pending Verification"}
@@ -595,24 +835,22 @@ function VendorProfile() {
 
             </div>
 
-            <div className="vendor-profile-actions">
+            {/* ACTIONS */}
 
+            <div className="vendor-profile-actions">
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={saving}
               >
                 {saving
-                  ? "Saving..."
+                  ? "Saving Changes..."
                   : "Save Changes"}
               </button>
-
             </div>
 
           </form>
-
         </section>
-
       </div>
     </main>
   );

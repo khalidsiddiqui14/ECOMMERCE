@@ -17,6 +17,9 @@ function Login() {
   const [password, setPassword] =
     useState("");
 
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [loading, setLoading] =
     useState(false);
 
@@ -264,20 +267,72 @@ function Login() {
               Password
             </label>
 
-            <input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(event) =>
-                setPassword(
-                  event.target.value
-                )
-              }
-              autoComplete="current-password"
-              required
-              disabled={loading}
-            />
+            <div
+              style={{
+                position: "relative",
+              }}
+            >
+              <input
+                id="password"
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) =>
+                  setPassword(
+                    event.target.value
+                  )
+                }
+                autoComplete="current-password"
+                required
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  paddingRight: "48px",
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowPassword(
+                    (previous) =>
+                      !previous
+                  )
+                }
+                disabled={loading}
+                aria-label={
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
+                }
+                title={
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
+                }
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform:
+                    "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  cursor: loading
+                    ? "not-allowed"
+                    : "pointer",
+                  padding: "4px",
+                  fontSize: "18px",
+                  lineHeight: 1,
+                }}
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
 
           </div>
 

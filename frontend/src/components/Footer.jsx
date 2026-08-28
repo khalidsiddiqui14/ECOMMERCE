@@ -1,9 +1,12 @@
+import { Link } from "react-router-dom";
+
 function Footer() {
   return (
     <footer className="footer">
       <div className="footer-container">
         <div className="footer-section">
           <h2>E-Shop</h2>
+
           <p>
             Your trusted online store for quality
             products at great prices.
@@ -13,27 +16,61 @@ function Footer() {
         <div className="footer-section">
           <h3>Quick Links</h3>
 
-          <a href="/">Home</a>
-          <a href="/products">Products</a>
-          <a href="/wishlist">Wishlist</a>
-          <a href="/cart">Cart</a>
+          <Link to="/">
+            Home
+          </Link>
+
+          <Link to="/products">
+            Products
+          </Link>
+
+          <Link to="/wishlist">
+            Wishlist
+          </Link>
+
+          <Link to="/cart">
+            Cart
+          </Link>
         </div>
 
         <div className="footer-section">
           <h3>Customer</h3>
 
-          <a href="/orders">My Orders</a>
-          <a href="/profile">My Profile</a>
-          <a href="/login">Login</a>
-          <a href="/register">Register</a>
+          <Link to="/orders">
+            My Orders
+          </Link>
+
+          <Link to="/profile">
+            My Profile
+          </Link>
+
+          <Link to="/settings">
+            Settings
+          </Link>
+
+          <Link to="/login">
+            Login
+          </Link>
+
+          <Link to="/register">
+            Register
+          </Link>
         </div>
 
         <div className="footer-section">
           <h3>Contact</h3>
 
-          <p>Email: support@eshop.com</p>
-          <p>Phone: +91 98765 43210</p>
-          <p>India</p>
+          <p>
+            Email: support@eshop.com
+          </p>
+
+          <p>
+            Phone: +91 98765 43210
+          </p>
+
+          <p>
+            India
+          </p>
         </div>
       </div>
 

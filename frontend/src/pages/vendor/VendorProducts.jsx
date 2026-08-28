@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -18,6 +19,9 @@ function VendorProducts() {
   const [loading, setLoading] =
     useState(true);
 
+  const [refreshing, setRefreshing] =
+    useState(false);
+
   const [error, setError] =
     useState("");
 
@@ -30,55 +34,77 @@ function VendorProducts() {
   const [status, setStatus] =
     useState("");
 
-  // =========================
-  // Load Products
-  // =========================
+  const [deletingId, setDeletingId] =
+    useState(null);
 
-  const loadProducts = async () => {
-    try {
+  const loadProducts = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       setError("");
-      setLoading(true);
 
-      const data =
-        await getVendorProducts();
+      try {
+        const data =
+          await getVendorProducts();
 
-      setProducts(
-        data.results || data
-      );
-    } catch (error) {
-      console.error(
-        "VENDOR PRODUCTS ERROR:",
-        error
-      );
+        const productList =
+          Array.isArray(data)
+            ? data
+            : Array.isArray(data?.results)
+              ? data.results
+              : [];
 
-      setError(
-        error.response?.data?.detail ||
-          error.message ||
-          "Products load nahi ho paaye."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        setProducts(productList);
+      } catch (error) {
+        console.error(
+          "VENDOR PRODUCTS ERROR:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Products load nahi ho paaye."
+        );
+      } finally {
+        if (isRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchProducts = async () => {
-      try {
-        if (!cancelled) {
-          setError("");
-          setLoading(true);
-        }
+      setLoading(true);
+      setError("");
 
+      try {
         const data =
           await getVendorProducts();
 
-        if (!cancelled) {
-          setProducts(
-            data.results || data
-          );
+        if (cancelled) {
+          return;
         }
+
+        const productList =
+          Array.isArray(data)
+            ? data
+            : Array.isArray(data?.results)
+              ? data.results
+              : [];
+
+        setProducts(productList);
       } catch (error) {
         console.error(
           "VENDOR PRODUCTS ERROR:",
@@ -88,6 +114,7 @@ function VendorProducts() {
         if (!cancelled) {
           setError(
             error.response?.data?.detail ||
+              error.response?.data?.message ||
               error.message ||
               "Products load nahi ho paaye."
           );
@@ -106,35 +133,37 @@ function VendorProducts() {
     };
   }, []);
 
-  // =========================
-  // Delete Product
-  // =========================
-
   const handleDelete = async (
     productId,
     productName
   ) => {
+    if (deletingId) {
+      return;
+    }
+
     const confirmed =
       window.confirm(
-        `Are you sure you want to delete "${productName}"?`
+        `Are you sure you want to delete "${productName}"? This action cannot be undone.`
       );
 
     if (!confirmed) {
       return;
     }
 
-    try {
-      setError("");
+    setDeletingId(productId);
+    setError("");
 
+    try {
       await deleteVendorProduct(
         productId
       );
 
-      setProducts((previous) =>
-        previous.filter(
-          (product) =>
-            product.id !== productId
-        )
+      setProducts(
+        (previous) =>
+          previous.filter(
+            (product) =>
+              product.id !== productId
+          )
       );
     } catch (error) {
       console.error(
@@ -144,48 +173,71 @@ function VendorProducts() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
           "Product delete nahi ho paaya."
       );
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  // =========================
-  // Search + Filters
-  // =========================
-
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const searchValue =
-        search.toLowerCase().trim();
+    const searchValue =
+      search.toLowerCase().trim();
 
-      const matchesSearch =
-        !searchValue ||
-        product.name
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product.sku
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product.description
-          ?.toLowerCase()
-          .includes(searchValue);
+    return products.filter(
+      (product) => {
+        const productName =
+          String(
+            product.name || ""
+          ).toLowerCase();
 
-      const matchesCategory =
-        !category ||
-        String(product.category) ===
-          String(category);
+        const sku =
+          String(
+            product.sku || ""
+          ).toLowerCase();
 
-      const matchesStatus =
-        !status ||
-        product.status?.toLowerCase() ===
-          status.toLowerCase();
+        const description =
+          String(
+            product.description || ""
+          ).toLowerCase();
 
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesStatus
-      );
-    });
+        const productStatus =
+          String(
+            product.status || ""
+          ).toLowerCase();
+
+        const matchesSearch =
+          !searchValue ||
+          productName.includes(
+            searchValue
+          ) ||
+          sku.includes(
+            searchValue
+          ) ||
+          description.includes(
+            searchValue
+          );
+
+        const matchesCategory =
+          !category ||
+          String(
+            product.category
+          ) === String(category);
+
+        const matchesStatus =
+          !status ||
+          productStatus ===
+            status.toLowerCase();
+
+        return (
+          matchesSearch &&
+          matchesCategory &&
+          matchesStatus
+        );
+      }
+    );
   }, [
     products,
     search,
@@ -193,55 +245,94 @@ function VendorProducts() {
     status,
   ]);
 
-  // =========================
-  // Categories
-  // =========================
-
   const categories = useMemo(() => {
     const uniqueCategories =
       new Set();
 
-    products.forEach((product) => {
-      if (product.category) {
-        uniqueCategories.add(
-          String(product.category)
-        );
+    products.forEach(
+      (product) => {
+        if (
+          product.category !==
+            null &&
+          product.category !==
+            undefined &&
+          product.category !== ""
+        ) {
+          uniqueCategories.add(
+            String(product.category)
+          );
+        }
       }
-    });
+    );
 
     return Array.from(
       uniqueCategories
+    ).sort(
+      (a, b) =>
+        Number(a) - Number(b)
     );
   }, [products]);
 
-  // =========================
-  // Loading
-  // =========================
+  const totalProducts =
+    products.length;
+
+  const publishedProducts =
+    products.filter(
+      (product) =>
+        String(
+          product.status || ""
+        ).toLowerCase() ===
+        "published"
+    ).length;
+
+  const outOfStockProducts =
+    products.filter(
+      (product) =>
+        Number(product.stock || 0) <=
+        0
+    ).length;
+
+  const formatPrice = (value) =>
+    `₹${Number(
+      value || 0
+    ).toLocaleString("en-IN")}`;
+
+  const formatStatus = (
+    value
+  ) => {
+    if (!value) {
+      return "Unknown";
+    }
+
+    return String(value)
+      .replaceAll("_", " ")
+      .replace(
+        /^./,
+        (character) =>
+          character.toUpperCase()
+      );
+  };
 
   if (loading) {
     return (
       <main className="vendor-products-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading products...
         </div>
       </main>
     );
   }
 
-  // =========================
-  // Main UI
-  // =========================
-
   return (
     <main className="vendor-products-page">
       <div className="vendor-container">
-
-        {/* ==================== */}
-        {/* Header */}
-        {/* ==================== */}
+        {/* HEADER */}
 
         <div className="vendor-products-header">
-
           <div>
             <span className="vendor-badge">
               Vendor Panel
@@ -252,66 +343,118 @@ function VendorProducts() {
             </h1>
 
             <p>
-              Manage the products in your
-              store.
+              Manage the products in
+              your store.
             </p>
           </div>
 
-          {/* Add Product */}
+          <div className="vendor-products-header-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                loadProducts(true)
+              }
+              disabled={refreshing}
+            >
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
 
-          <Link
-            to="/vendor/products/create"
-            className="btn btn-primary"
-          >
-            + Add Product
-          </Link>
-
+            <Link
+              to="/vendor/products/create"
+              className="btn btn-primary"
+            >
+              + Add Product
+            </Link>
+          </div>
         </div>
 
-        {/* ==================== */}
-        {/* Error */}
-        {/* ==================== */}
+        {/* ERROR */}
 
         {error && (
-          <div className="auth-error">
-
+          <div
+            className="auth-error"
+            role="alert"
+          >
             <span>
               {error}
             </span>
 
             <button
+              type="button"
               className="btn btn-secondary"
-              onClick={loadProducts}
-              style={{
-                marginLeft: "10px",
-              }}
+              onClick={() =>
+                loadProducts(true)
+              }
+              disabled={refreshing}
             >
-              Try Again
+              {refreshing
+                ? "Retrying..."
+                : "Try Again"}
             </button>
-
           </div>
         )}
 
-        {/* ==================== */}
-        {/* Toolbar */}
-        {/* ==================== */}
+        {/* SUMMARY */}
+
+        <div className="vendor-products-summary">
+          <div>
+            <span>
+              Total Products
+            </span>
+
+            <strong>
+              {totalProducts}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Published
+            </span>
+
+            <strong>
+              {publishedProducts}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Out of Stock
+            </span>
+
+            <strong>
+              {outOfStockProducts}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Showing
+            </span>
+
+            <strong>
+              {filteredProducts.length}
+            </strong>
+          </div>
+        </div>
+
+        {/* TOOLBAR */}
 
         <div className="vendor-products-toolbar">
-
-          {/* Search */}
-
           <input
             type="search"
-            placeholder="Search products..."
+            placeholder="Search by name, SKU or description..."
             value={search}
             onChange={(event) =>
               setSearch(
                 event.target.value
               )
             }
+            aria-label="Search products"
           />
-
-          {/* Category */}
 
           <select
             value={category}
@@ -320,8 +463,8 @@ function VendorProducts() {
                 event.target.value
               )
             }
+            aria-label="Filter by category"
           >
-
             <option value="">
               All Categories
             </option>
@@ -332,14 +475,12 @@ function VendorProducts() {
                   key={categoryId}
                   value={categoryId}
                 >
-                  Category #{categoryId}
+                  Category #
+                  {categoryId}
                 </option>
               )
             )}
-
           </select>
-
-          {/* Status */}
 
           <select
             value={status}
@@ -348,8 +489,8 @@ function VendorProducts() {
                 event.target.value
               )
             }
+            aria-label="Filter by status"
           >
-
             <option value="">
               All Status
             </option>
@@ -365,28 +506,38 @@ function VendorProducts() {
             <option value="out_of_stock">
               Out of Stock
             </option>
-
           </select>
 
+          {(search ||
+            category ||
+            status) && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSearch("");
+                setCategory("");
+                setStatus("");
+              }}
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
-        {/* ==================== */}
-        {/* Product Table */}
-        {/* ==================== */}
+        {/* TABLE */}
 
         <div className="vendor-products-table-wrapper">
-
           {filteredProducts.length ===
           0 ? (
-
             <div className="products-empty">
-
               <h2>
                 No Products Found
               </h2>
 
               <p>
-                {products.length === 0
+                {products.length ===
+                0
                   ? "You haven't created any products yet."
                   : "No products match your search or filters."}
               </p>
@@ -397,20 +548,33 @@ function VendorProducts() {
                   to="/vendor/products/create"
                   className="btn btn-primary"
                 >
-                  + Add Your First Product
+                  + Add Your First
+                  Product
                 </Link>
               )}
 
+              {products.length >
+                0 &&
+                (search ||
+                  category ||
+                  status) && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setSearch("");
+                      setCategory("");
+                      setStatus("");
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                )}
             </div>
-
           ) : (
-
             <table className="vendor-products-table">
-
               <thead>
-
                 <tr>
-
                   <th>
                     Product
                   </th>
@@ -438,131 +602,125 @@ function VendorProducts() {
                   <th>
                     Actions
                   </th>
-
                 </tr>
-
               </thead>
 
               <tbody>
-
                 {filteredProducts.map(
-                  (product) => (
+                  (product) => {
+                    const isDeleting =
+                      deletingId ===
+                      product.id;
 
-                    <tr
-                      key={product.id}
-                    >
+                    const stock =
+                      Number(
+                        product.stock ||
+                          0
+                      );
 
-                      {/* Product */}
+                    return (
+                      <tr
+                        key={
+                          product.id
+                        }
+                      >
+                        <td>
+                          <strong>
+                            {product.name ||
+                              `Product #${product.id}`}
+                          </strong>
+                        </td>
 
-                      <td>
-                        <strong>
-                          {product.name}
-                        </strong>
-                      </td>
+                        <td>
+                          {product.sku ||
+                            "-"}
+                        </td>
 
-                      {/* SKU */}
+                        <td>
+                          {product.category
+                            ? `Category #${product.category}`
+                            : "-"}
+                        </td>
 
-                      <td>
-                        {product.sku ||
-                          "-"}
-                      </td>
+                        <td>
+                          {formatPrice(
+                            product.price
+                          )}
+                        </td>
 
-                      {/* Category */}
-
-                      <td>
-                        Category #
-                        {product.category}
-                      </td>
-
-                      {/* Price */}
-
-                      <td>
-                        ₹
-                        {Number(
-                          product.price ||
-                            0
-                        ).toLocaleString(
-                          "en-IN"
-                        )}
-                      </td>
-
-                      {/* Stock */}
-
-                      <td>
-                        {product.stock}
-                      </td>
-
-                      {/* Status */}
-
-                      <td>
-
-                        <span
-                          className={`product-status ${
-                            product.status
-                              ?.toLowerCase()
-                          }`}
-                        >
-                          {product.status}
-                        </span>
-
-                      </td>
-
-                      {/* Actions */}
-
-                      <td>
-
-                        <div className="product-table-actions">
-
-                          {/* View */}
-
-                          <Link
-                            to={`/products/${product.id}`}
-                            className="table-action view"
-                          >
-                            View
-                          </Link>
-
-                          {/* Edit */}
-
-                          <Link
-                            to={`/vendor/products/${product.id}/edit`}
-                            className="table-action edit"
-                          >
-                            Edit
-                          </Link>
-
-                          {/* Delete */}
-
-                          <button
-                            type="button"
-                            className="table-action delete"
-                            onClick={() =>
-                              handleDelete(
-                                product.id,
-                                product.name
-                              )
+                        <td>
+                          <span
+                            className={
+                              stock <= 0
+                                ? "stock-status out-of-stock"
+                                : "stock-status"
                             }
                           >
-                            Delete
-                          </button>
+                            {stock}
+                          </span>
+                        </td>
 
-                        </div>
+                        <td>
+                          <span
+                            className={`product-status ${
+                              String(
+                                product.status ||
+                                  "unknown"
+                              ).toLowerCase()
+                            }`}
+                          >
+                            {formatStatus(
+                              product.status
+                            )}
+                          </span>
+                        </td>
 
-                      </td>
+                        <td>
+                          <div className="product-table-actions">
+                            <Link
+                              to={`/products/${product.id}`}
+                              className="table-action view"
+                            >
+                              View
+                            </Link>
 
-                    </tr>
+                            <Link
+                              to={`/vendor/products/${product.id}/edit`}
+                              className="table-action edit"
+                            >
+                              Edit
+                            </Link>
 
-                  )
+                            <button
+                              type="button"
+                              className="table-action delete"
+                              onClick={() =>
+                                handleDelete(
+                                  product.id,
+                                  product.name ||
+                                    `Product #${product.id}`
+                                )
+                              }
+                              disabled={
+                                isDeleting ||
+                                deletingId !==
+                                  null
+                              }
+                            >
+                              {isDeleting
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
                 )}
-
               </tbody>
-
             </table>
-
           )}
-
         </div>
-
       </div>
     </main>
   );

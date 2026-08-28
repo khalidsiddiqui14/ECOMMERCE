@@ -1,5 +1,6 @@
 import api from "./api";
 
+// Vendor Dashboard
 export const getVendorDashboard = async () => {
   const response = await api.get(
     "orders/vendor-dashboard/"
@@ -8,6 +9,7 @@ export const getVendorDashboard = async () => {
   return response.data;
 };
 
+// Vendor Profile
 export const getVendorProfile = async () => {
   const response = await api.get(
     "vendors/me/"
@@ -27,6 +29,7 @@ export const updateVendorProfile = async (
   return response.data;
 };
 
+// Vendor Store
 export const getVendorStore = async () => {
   const response = await api.get(
     "stores/me/"
@@ -46,6 +49,7 @@ export const updateVendorStore = async (
   return response.data;
 };
 
+// Vendor Products
 export const getVendorProducts = async () => {
   const response = await api.get(
     "products/"
@@ -64,13 +68,20 @@ export const createVendorProduct = async (
 
   return response.data;
 };
+
 export const uploadVendorProductImage = async (
   productId,
   imageData
 ) => {
   const response = await api.post(
     `products/${productId}/images/`,
-    imageData
+    imageData,
+    {
+      headers: {
+        "Content-Type":
+          "multipart/form-data",
+      },
+    }
   );
 
   return response.data;
@@ -85,7 +96,6 @@ export const updateVendorProduct = async (
     productData
   );
 
-
   return response.data;
 };
 
@@ -99,6 +109,7 @@ export const deleteVendorProduct = async (
   return response.data;
 };
 
+// Vendor Orders
 export const getVendorOrders = async () => {
   const response = await api.get(
     "orders/vendor-orders/"

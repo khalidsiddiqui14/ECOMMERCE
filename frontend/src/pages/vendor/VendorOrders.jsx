@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -9,60 +10,105 @@ import {
   updateVendorOrderStatus,
 } from "../../services/vendorService";
 
+const ORDER_STATUSES = [
+  "PENDING",
+  "CONFIRMED",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+];
+
 function VendorOrders() {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [filter, setFilter] = useState("All");
 
-  const loadOrders = async () => {
-    try {
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [updatingOrderId, setUpdatingOrderId] =
+    useState(null);
+
+  const [error, setError] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState("All");
+
+  const loadOrders = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       setError("");
-      setLoading(true);
 
-      const data = await getVendorOrders();
+      try {
+        const data =
+          await getVendorOrders();
 
-      setOrders(
-        Array.isArray(data)
-          ? data
-          : []
-      );
-    } catch (error) {
-      console.error(
-        "VENDOR ORDERS ERROR:",
-        error
-      );
+        const orderList =
+          Array.isArray(data)
+            ? data
+            : Array.isArray(
+                data?.results
+              )
+            ? data.results
+            : [];
 
-      setError(
-        error.response?.data?.detail ||
-          error.message ||
-          "Orders load nahi ho paaye."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        setOrders(orderList);
+      } catch (error) {
+        console.error(
+          "VENDOR ORDERS ERROR:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Orders load nahi ho paaye."
+        );
+      } finally {
+        if (isRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchOrders = async () => {
-      try {
-        if (!cancelled) {
-          setError("");
-          setLoading(true);
-        }
+      setLoading(true);
+      setError("");
 
+      try {
         const data =
           await getVendorOrders();
 
-        if (!cancelled) {
-          setOrders(
-            Array.isArray(data)
-              ? data
-              : []
-          );
+        if (cancelled) {
+          return;
         }
+
+        const orderList =
+          Array.isArray(data)
+            ? data
+            : Array.isArray(
+                data?.results
+              )
+            ? data.results
+            : [];
+
+        setOrders(orderList);
       } catch (error) {
         console.error(
           "VENDOR ORDERS ERROR:",
@@ -72,6 +118,7 @@ function VendorOrders() {
         if (!cancelled) {
           setError(
             error.response?.data?.detail ||
+              error.response?.data?.message ||
               error.message ||
               "Orders load nahi ho paaye."
           );
@@ -94,24 +141,38 @@ function VendorOrders() {
     orderId,
     newStatus
   ) => {
-    try {
-      setError("");
+    if (
+      updatingOrderId !== null
+    ) {
+      return;
+    }
 
+    setError("");
+    setUpdatingOrderId(orderId);
+
+    try {
       const response =
         await updateVendorOrderStatus(
           orderId,
           newStatus
         );
 
-      setOrders((previousOrders) =>
-        previousOrders.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                status: response.status,
-              }
-            : order
-        )
+      const updatedStatus =
+        response?.status ||
+        newStatus;
+
+      setOrders(
+        (previousOrders) =>
+          previousOrders.map(
+            (order) =>
+              order.id === orderId
+                ? {
+                    ...order,
+                    status:
+                      updatedStatus,
+                  }
+                : order
+          )
       );
     } catch (error) {
       console.error(
@@ -121,8 +182,12 @@ function VendorOrders() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
           "Order status update nahi ho paaya."
       );
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -133,35 +198,179 @@ function VendorOrders() {
 
     return orders.filter(
       (order) =>
-        order.status === filter
+        String(
+          order.status || ""
+        ).toUpperCase() ===
+        filter
     );
   }, [orders, filter]);
+
+  const orderStats = useMemo(() => {
+    const stats = {
+      total: orders.length,
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+
+    orders.forEach((order) => {
+      const status =
+        String(
+          order.status || ""
+        ).toUpperCase();
+
+      if (status === "PENDING") {
+        stats.pending += 1;
+      }
+
+      if (
+        status ===
+          "CONFIRMED" ||
+        status === "PROCESSING"
+      ) {
+        stats.processing += 1;
+      }
+
+      if (status === "SHIPPED") {
+        stats.shipped += 1;
+      }
+
+      if (status === "DELIVERED") {
+        stats.delivered += 1;
+      }
+
+      if (status === "CANCELLED") {
+        stats.cancelled += 1;
+      }
+    });
+
+    return stats;
+  }, [orders]);
 
   const formatDate = (date) => {
     if (!date) {
       return "-";
     }
 
-    return new Date(
-      date
-    ).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    const parsedDate =
+      new Date(date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return "-";
+    }
+
+    return parsedDate.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (
+    amount
+  ) => {
     return Number(
       amount || 0
     ).toLocaleString("en-IN");
+  };
+
+  const getOrderItemCount = (
+    order
+  ) => {
+    if (
+      !Array.isArray(
+        order?.items
+      )
+    ) {
+      return 0;
+    }
+
+    return order.items.reduce(
+      (total, item) =>
+        total +
+        Number(
+          item?.quantity || 0
+        ),
+      0
+    );
+  };
+
+  const getCustomerName = (
+    order
+  ) => {
+    return (
+      order?.customer ||
+      order?.customer_name ||
+      order?.user?.username ||
+      "Customer"
+    );
+  };
+
+  const getCustomerPhone = (
+    order
+  ) => {
+    return (
+      order?.phone ||
+      order?.customer_phone ||
+      order?.user?.phone ||
+      ""
+    );
+  };
+
+  const getOrderTotal = (
+    order
+  ) => {
+    return (
+      order?.total ??
+      order?.total_amount ??
+      0
+    );
+  };
+
+  const getOrderDate = (
+    order
+  ) => {
+    return (
+      order?.date ||
+      order?.created_at ||
+      order?.created
+    );
+  };
+
+  const getStatusLabel = (
+    status
+  ) => {
+    if (!status) {
+      return "Unknown";
+    }
+
+    return String(status)
+      .replaceAll("_", " ")
+      .replace(
+        /^./,
+        (character) =>
+          character.toUpperCase()
+      );
   };
 
   if (loading) {
     return (
       <main className="vendor-orders-page">
         <div className="vendor-container">
-          <div className="products-loading">
+          <div
+            className="products-loading"
+            role="status"
+            aria-live="polite"
+          >
             Loading orders...
           </div>
         </div>
@@ -172,13 +381,18 @@ function VendorOrders() {
   return (
     <main className="vendor-orders-page">
       <div className="vendor-container">
+
+        {/* HEADER */}
+
         <div className="vendor-orders-header">
           <div>
             <span className="vendor-badge">
               Vendor Panel
             </span>
 
-            <h1>My Orders</h1>
+            <h1>
+              My Orders
+            </h1>
 
             <p>
               Manage and update your
@@ -186,237 +400,416 @@ function VendorOrders() {
             </p>
           </div>
 
-          <select
-            className="vendor-order-filter"
-            value={filter}
-            onChange={(event) =>
-              setFilter(
-                event.target.value
-              )
-            }
-          >
-            <option value="All">
-              All Orders
-            </option>
+          <div className="vendor-orders-header-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                loadOrders(true)
+              }
+              disabled={refreshing}
+            >
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
 
-            <option value="PENDING">
-              Pending
-            </option>
+            <select
+              className="vendor-order-filter"
+              value={filter}
+              onChange={(event) =>
+                setFilter(
+                  event.target.value
+                )
+              }
+              aria-label="Filter orders by status"
+            >
+              <option value="All">
+                All Orders
+              </option>
 
-            <option value="CONFIRMED">
-              Confirmed
-            </option>
-
-            <option value="PROCESSING">
-              Processing
-            </option>
-
-            <option value="SHIPPED">
-              Shipped
-            </option>
-
-            <option value="DELIVERED">
-              Delivered
-            </option>
-
-            <option value="CANCELLED">
-              Cancelled
-            </option>
-          </select>
+              {ORDER_STATUSES.map(
+                (status) => (
+                  <option
+                    key={status}
+                    value={status}
+                  >
+                    {getStatusLabel(
+                      status
+                    )}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
         </div>
 
+        {/* ERROR */}
+
         {error && (
-          <div className="auth-error">
-            <span>{error}</span>
+          <div
+            className="auth-error"
+            role="alert"
+          >
+            <span>
+              {error}
+            </span>
 
             <button
+              type="button"
               className="btn btn-secondary"
-              onClick={loadOrders}
-              style={{
-                marginLeft: "10px",
-              }}
+              onClick={() =>
+                loadOrders(true)
+              }
+              disabled={refreshing}
             >
-              Try Again
+              {refreshing
+                ? "Retrying..."
+                : "Try Again"}
             </button>
           </div>
         )}
 
+        {/* STATS */}
+
+        <div className="vendor-orders-summary">
+          <div>
+            <span>
+              Total Orders
+            </span>
+
+            <strong>
+              {orderStats.total}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Pending
+            </span>
+
+            <strong>
+              {orderStats.pending}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Processing
+            </span>
+
+            <strong>
+              {orderStats.processing}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Shipped
+            </span>
+
+            <strong>
+              {orderStats.shipped}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Delivered
+            </span>
+
+            <strong>
+              {orderStats.delivered}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Cancelled
+            </span>
+
+            <strong>
+              {orderStats.cancelled}
+            </strong>
+          </div>
+        </div>
+
+        {/* TABLE */}
+
         <div className="vendor-orders-table-wrapper">
-          {filteredOrders.length === 0 ? (
+          {filteredOrders.length ===
+          0 ? (
             <div className="products-empty">
               <h2>
                 No Orders Found
               </h2>
 
               <p>
-                There are no orders
-                matching this filter.
+                {orders.length === 0
+                  ? "There are no customer orders yet."
+                  : "There are no orders matching this filter."}
               </p>
+
+              {orders.length >
+                0 &&
+                filter !==
+                  "All" && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() =>
+                      setFilter(
+                        "All"
+                      )
+                    }
+                  >
+                    View All Orders
+                  </button>
+                )}
             </div>
           ) : (
             <table className="vendor-orders-table">
               <thead>
                 <tr>
-                  <th>Order ID</th>
-                  <th>Customer</th>
-                  <th>Product</th>
-                  <th>Qty</th>
-                  <th>Total</th>
-                  <th>Date</th>
-                  <th>Status</th>
+                  <th>
+                    Order ID
+                  </th>
+
+                  <th>
+                    Customer
+                  </th>
+
+                  <th>
+                    Product
+                  </th>
+
+                  <th>
+                    Qty
+                  </th>
+
+                  <th>
+                    Total
+                  </th>
+
+                  <th>
+                    Date
+                  </th>
+
+                  <th>
+                    Status
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {filteredOrders.map(
-                  (order) => (
-                    <tr key={order.id}>
-                      <td>
-                        <strong>
-                          {
-                            order.order_number
-                          }
-                        </strong>
-                      </td>
+                  (order) => {
+                    const status =
+                      String(
+                        order.status ||
+                          "PENDING"
+                      ).toUpperCase();
 
-                      <td>
-                        <div>
+                    const isUpdating =
+                      updatingOrderId ===
+                      order.id;
+
+                    const items =
+                      Array.isArray(
+                        order.items
+                      )
+                        ? order.items
+                        : [];
+
+                    return (
+                      <tr
+                        key={
+                          order.id
+                        }
+                      >
+                        {/* ORDER */}
+
+                        <td>
                           <strong>
-                            {
-                              order.customer
-                            }
+                            {order.order_number ||
+                              `#${order.id}`}
                           </strong>
+                        </td>
 
-                          <small
-                            style={{
-                              display:
-                                "block",
-                              marginTop:
-                                "4px",
-                            }}
-                          >
-                            {order.phone}
-                          </small>
-                        </div>
-                      </td>
+                        {/* CUSTOMER */}
 
-                      <td>
-                        {order.items &&
-                        order.items.length >
-                          0 ? (
+                        <td>
                           <div>
-                            {order.items.map(
-                              (item) => (
-                                <div
-                                  key={
-                                    item.id
-                                  }
-                                  style={{
-                                    marginBottom:
-                                      "4px",
-                                  }}
-                                >
-                                  <strong>
-                                    {
-                                      item.product
-                                    }
-                                  </strong>
+                            <strong>
+                              {getCustomerName(
+                                order
+                              )}
+                            </strong>
 
-                                  <small
-                                    style={{
-                                      display:
-                                        "block",
-                                    }}
-                                  >
-                                    SKU:{" "}
-                                    {
-                                      item.sku
-                                    }
-                                  </small>
-                                </div>
-                              )
+                            {getCustomerPhone(
+                              order
+                            ) && (
+                              <small
+                                style={{
+                                  display:
+                                    "block",
+                                  marginTop:
+                                    "4px",
+                                }}
+                              >
+                                {
+                                  getCustomerPhone(
+                                    order
+                                  )
+                                }
+                              </small>
                             )}
                           </div>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
+                        </td>
 
-                      <td>
-                        {order.items &&
-                        order.items.length >
-                          0
-                          ? order.items.reduce(
+                        {/* PRODUCTS */}
+
+                        <td>
+                          {items.length >
+                          0 ? (
+                            <div>
+                              {items.map(
+                                (
+                                  item
+                                ) => (
+                                  <div
+                                    key={
+                                      item.id ||
+                                      `${order.id}-${item.product}`
+                                    }
+                                    style={{
+                                      marginBottom:
+                                        "6px",
+                                    }}
+                                  >
+                                    <strong>
+                                      {item.product ||
+                                        item.product_name ||
+                                        `Product #${item.product_id || ""}`}
+                                    </strong>
+
+                                    {item.sku && (
+                                      <small
+                                        style={{
+                                          display:
+                                            "block",
+                                          marginTop:
+                                            "2px",
+                                        }}
+                                      >
+                                        SKU:{" "}
+                                        {
+                                          item.sku
+                                        }
+                                      </small>
+                                    )}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+
+                        {/* QUANTITY */}
+
+                        <td>
+                          {getOrderItemCount(
+                            order
+                          )}
+                        </td>
+
+                        {/* TOTAL */}
+
+                        <td>
+                          ₹
+                          {formatCurrency(
+                            getOrderTotal(
+                              order
+                            )
+                          )}
+                        </td>
+
+                        {/* DATE */}
+
+                        <td>
+                          {formatDate(
+                            getOrderDate(
+                              order
+                            )
+                          )}
+                        </td>
+
+                        {/* STATUS */}
+
+                        <td>
+                          <select
+                            className={`order-status-select status-${status.toLowerCase()}`}
+                            value={
+                              status
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              updateStatus(
+                                order.id,
+                                event
+                                  .target
+                                  .value
+                              )
+                            }
+                            disabled={
+                              isUpdating ||
+                              updatingOrderId !==
+                                null
+                            }
+                            aria-label={`Update order ${
+                              order.order_number ||
+                              order.id
+                            } status`}
+                          >
+                            {ORDER_STATUSES.map(
                               (
-                                total,
-                                item
-                              ) =>
-                                total +
-                                Number(
-                                  item.quantity ||
-                                    0
-                                ),
-                              0
-                            )
-                          : 0}
-                      </td>
+                                orderStatus
+                              ) => (
+                                <option
+                                  key={
+                                    orderStatus
+                                  }
+                                  value={
+                                    orderStatus
+                                  }
+                                >
+                                  {getStatusLabel(
+                                    orderStatus
+                                  )}
+                                </option>
+                              )
+                            )}
+                          </select>
 
-                      <td>
-                        ₹
-                        {formatCurrency(
-                          order.total
-                        )}
-                      </td>
-
-                      <td>
-                        {formatDate(
-                          order.date
-                        )}
-                      </td>
-
-                      <td>
-                        <select
-                          className={`order-status-select status-${order.status.toLowerCase()}`}
-                          value={
-                            order.status
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            updateStatus(
-                              order.id,
-                              event.target
-                                .value
-                            )
-                          }
-                        >
-                          <option value="PENDING">
-                            Pending
-                          </option>
-
-                          <option value="CONFIRMED">
-                            Confirmed
-                          </option>
-
-                          <option value="PROCESSING">
-                            Processing
-                          </option>
-
-                          <option value="SHIPPED">
-                            Shipped
-                          </option>
-
-                          <option value="DELIVERED">
-                            Delivered
-                          </option>
-
-                          <option value="CANCELLED">
-                            Cancelled
-                          </option>
-                        </select>
-                      </td>
-                    </tr>
-                  )
+                          {isUpdating && (
+                            <small
+                              style={{
+                                display:
+                                  "block",
+                                marginTop:
+                                  "5px",
+                              }}
+                            >
+                              Updating...
+                            </small>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
                 )}
               </tbody>
             </table>

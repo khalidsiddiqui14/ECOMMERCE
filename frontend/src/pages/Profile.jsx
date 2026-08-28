@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getProfile } from "../services/userService";
@@ -8,111 +8,259 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await getProfile();
+
+      if (!data) {
+        throw new Error(
+          "Profile data was not returned."
+        );
+      }
+
+      setUser(data);
+
+      // Keep local user information in sync.
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data)
+      );
+    } catch (error) {
+      console.error(
+        "PROFILE ERROR:",
+        error
+      );
+
+      setError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "Profile load nahi ho paaya."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadProfile = async () => {
+    let cancelled = false;
+
+    const fetchProfile = async () => {
+      setLoading(true);
+      setError("");
+
       try {
         const data = await getProfile();
 
-        setUser(data);
-      } catch (error) {
-        console.error("PROFILE ERROR:", error);
+        if (cancelled) {
+          return;
+        }
 
-        setError(
-          error.response?.data?.detail ||
-            error.message ||
-            "Profile load nahi ho paaya."
+        if (!data) {
+          throw new Error(
+            "Profile data was not returned."
+          );
+        }
+
+        setUser(data);
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data)
         );
+      } catch (error) {
+        console.error(
+          "PROFILE ERROR:",
+          error
+        );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.response?.data?.message ||
+              error.message ||
+              "Profile load nahi ho paaya."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadProfile();
+    fetchProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
     return (
       <main className="profile-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading profile...
         </div>
       </main>
     );
   }
 
-  if (error) {
+  if (error || !user) {
     return (
       <main className="profile-page">
         <div className="products-empty">
-          <h2>Profile Error</h2>
+          <h2>
+            Unable to Load Profile
+          </h2>
 
-          <p>{error}</p>
+          <p>
+            {error ||
+              "Profile information is unavailable."}
+          </p>
 
-          <Link
-            to="/login"
-            className="btn btn-primary"
-          >
-            Login Again
-          </Link>
+          <div className="profile-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={loadProfile}
+            >
+              Try Again
+            </button>
+
+            <Link
+              to="/login"
+              className="btn btn-secondary"
+            >
+              Login Again
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
+  const username =
+    user.username || "My Account";
+
+  const email =
+    user.email || "Not provided";
+
+  const phone =
+    user.phone || "Not provided";
+
+  const role =
+    user.role || "MEMBER";
+
+  const avatar =
+    username.charAt(0).toUpperCase();
+
+  const formattedRole =
+    role
+      .toLowerCase()
+      .replace(
+        /^./,
+        (character) =>
+          character.toUpperCase()
+      );
+
   return (
     <main className="profile-page">
       <div className="profile-container">
         <div className="profile-header">
-          <div className="profile-avatar">
-            {user?.username
-              ? user.username
-                  .charAt(0)
-                  .toUpperCase()
-              : "U"}
+          <div
+            className="profile-avatar"
+            aria-hidden="true"
+          >
+            {avatar}
           </div>
 
           <div>
             <h1>
-              {user?.username || "My Account"}
+              {username}
             </h1>
 
             <p>
-              Manage your account information.
+              Manage your account
+              information.
             </p>
           </div>
         </div>
 
         <section className="profile-card">
-          <h2>Personal Information</h2>
+          <h2>
+            Personal Information
+          </h2>
 
           <div className="profile-grid">
             <div className="profile-field">
-              <span>Username</span>
+              <span>
+                Username
+              </span>
+
               <strong>
-                {user?.username || "-"}
+                {username}
               </strong>
             </div>
 
             <div className="profile-field">
-              <span>Email</span>
+              <span>
+                Email
+              </span>
+
               <strong>
-                {user?.email || "-"}
+                {email}
               </strong>
             </div>
 
             <div className="profile-field">
-              <span>Phone</span>
+              <span>
+                Phone
+              </span>
+
               <strong>
-                {user?.phone || "Not provided"}
+                {phone}
               </strong>
             </div>
 
             <div className="profile-field">
-              <span>Role</span>
+              <span>
+                Account Type
+              </span>
+
               <strong>
-                {user?.role || "MEMBER"}
+                {formattedRole}
               </strong>
             </div>
+          </div>
+        </section>
+
+        <section className="profile-card">
+          <h2>
+            Account & Security
+          </h2>
+
+          <div className="profile-actions">
+            <Link
+              to="/settings"
+              className="btn btn-secondary"
+            >
+              Account Settings
+            </Link>
+
+            <Link
+              to="/change-password"
+              className="btn btn-secondary"
+            >
+              Change Password
+            </Link>
           </div>
         </section>
 

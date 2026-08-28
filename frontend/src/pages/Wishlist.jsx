@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -9,17 +9,26 @@ import {
 function Wishlist() {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [removingItemId, setRemovingItemId] =
+    useState(null);
   const [error, setError] = useState("");
 
-  const loadWishlist = async () => {
-    try {
-      setError("");
+  const loadWishlist = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
+    try {
       const data = await getWishlist();
 
-      setWishlist(
-        data.results || data.items || data
-      );
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.items)
+            ? data.items
+            : [];
+
+      setWishlist(items);
     } catch (error) {
       console.error(
         "WISHLIST ERROR:",
@@ -28,33 +37,38 @@ function Wishlist() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           error.message ||
           "Wishlist load nahi ho paayi."
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchWishlist = async () => {
-      try {
-        if (!cancelled) {
-          setError("");
-          setLoading(true);
-        }
+      setLoading(true);
+      setError("");
 
+      try {
         const data = await getWishlist();
 
-        if (!cancelled) {
-          setWishlist(
-            data.results ||
-              data.items ||
-              data
-          );
+        if (cancelled) {
+          return;
         }
+
+        const items = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        setWishlist(items);
       } catch (error) {
         console.error(
           "WISHLIST ERROR:",
@@ -64,6 +78,7 @@ function Wishlist() {
         if (!cancelled) {
           setError(
             error.response?.data?.detail ||
+              error.response?.data?.message ||
               error.message ||
               "Wishlist load nahi ho paayi."
           );
@@ -83,10 +98,24 @@ function Wishlist() {
   }, []);
 
   const handleRemove = async (itemId) => {
+    if (
+      !itemId ||
+      removingItemId === itemId
+    ) {
+      return;
+    }
+
+    setRemovingItemId(itemId);
+    setError("");
+
     try {
       await removeFromWishlist(itemId);
 
-      await loadWishlist();
+      setWishlist((previous) =>
+        previous.filter(
+          (item) => item.id !== itemId
+        )
+      );
     } catch (error) {
       console.error(
         "REMOVE WISHLIST ERROR:",
@@ -95,30 +124,40 @@ function Wishlist() {
 
       setError(
         error.response?.data?.detail ||
+          error.response?.data?.message ||
           "Wishlist item remove nahi ho paaya."
       );
+    } finally {
+      setRemovingItemId(null);
     }
   };
 
   if (loading) {
     return (
       <main className="wishlist-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading wishlist...
         </div>
       </main>
     );
   }
 
-  if (error) {
+  if (error && wishlist.length === 0) {
     return (
       <main className="wishlist-page">
         <div className="products-empty">
-          <h2>Wishlist Error</h2>
+          <h2>
+            Unable to Load Wishlist
+          </h2>
 
           <p>{error}</p>
 
           <button
+            type="button"
             className="btn btn-primary"
             onClick={loadWishlist}
           >
@@ -134,10 +173,15 @@ function Wishlist() {
       <div className="wishlist-container">
         <div className="wishlist-header">
           <div>
-            <h1>My Wishlist</h1>
+            <h1>
+              My Wishlist
+            </h1>
 
             <p>
-              Products you've saved for later.
+              {wishlist.length} saved product
+              {wishlist.length === 1
+                ? ""
+                : "s"}.
             </p>
           </div>
 
@@ -149,17 +193,31 @@ function Wishlist() {
           </Link>
         </div>
 
+        {error && (
+          <div
+            className="auth-error"
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
+
         {wishlist.length === 0 ? (
           <div className="wishlist-empty">
-            <div className="wishlist-empty-icon">
+            <div
+              className="wishlist-empty-icon"
+              aria-hidden="true"
+            >
               ❤️
             </div>
 
-            <h2>Your Wishlist is Empty</h2>
+            <h2>
+              Your Wishlist is Empty
+            </h2>
 
             <p>
-              Save products you love and find
-              them here later.
+              Save products you love and
+              find them here later.
             </p>
 
             <Link
@@ -176,36 +234,69 @@ function Wishlist() {
                 item.product || item;
 
               const productId =
-                product.id || item.product;
+                product.id ||
+                item.product;
+
+              const productName =
+                product.name ||
+                `Product #${productId}`;
+
+              const productPrice =
+                Number(
+                  product.price || 0
+                );
+
+              const image =
+                Array.isArray(
+                  product.images
+                ) &&
+                product.images.length > 0
+                  ? product.images[0]
+                  : product.image;
+
+              const isRemoving =
+                removingItemId ===
+                item.id;
 
               return (
-                <div
+                <article
                   className="wishlist-card"
-                  key={item.id || productId}
+                  key={
+                    item.id ||
+                    productId
+                  }
                 >
                   <div className="wishlist-image">
-                    {product.images &&
-                    product.images.length > 0 ? (
+                    {image ? (
                       <img
-                        src={product.images[0]}
-                        alt={product.name}
+                        src={image}
+                        alt={productName}
+                        loading="lazy"
+                        onError={(
+                          event
+                        ) => {
+                          event.currentTarget.style.display =
+                            "none";
+                        }}
                       />
                     ) : (
-                      <span>🎧</span>
+                      <span
+                        role="img"
+                        aria-label="Product image unavailable"
+                      >
+                        📦
+                      </span>
                     )}
                   </div>
 
                   <div className="wishlist-info">
                     <h3>
-                      {product.name ||
-                        `Product #${productId}`}
+                      {productName}
                     </h3>
 
                     <p className="wishlist-price">
                       ₹
-                      {Number(
-                        product.price || 0
-                      ).toLocaleString(
+                      {productPrice.toLocaleString(
                         "en-IN"
                       )}
                     </p>
@@ -214,23 +305,30 @@ function Wishlist() {
                       <Link
                         to={`/products/${productId}`}
                         className="btn btn-primary"
+                        aria-label={`View ${productName}`}
                       >
                         View Product
                       </Link>
 
                       <button
+                        type="button"
                         className="btn btn-secondary"
                         onClick={() =>
                           handleRemove(
                             item.id
                           )
                         }
+                        disabled={
+                          isRemoving
+                        }
                       >
-                        Remove
+                        {isRemoving
+                          ? "Removing..."
+                          : "Remove"}
                       </button>
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>

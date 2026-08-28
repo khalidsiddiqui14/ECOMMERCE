@@ -32,26 +32,172 @@ function Checkout() {
       ...previous,
       [name]: value,
     }));
+
+    if (error) {
+      setError("");
+    }
+  };
+
+  const formatError = (error) => {
+    const data = error.response?.data;
+
+    if (!data) {
+      return (
+        error.message ||
+        "Order ya payment create nahi ho paaya."
+      );
+    }
+
+    if (data.missing_fields) {
+      if (
+        typeof data.missing_fields ===
+        "string"
+      ) {
+        return data.missing_fields;
+      }
+
+      return Object.entries(
+        data.missing_fields
+      )
+        .map(([field, message]) => {
+          const value = Array.isArray(message)
+            ? message.join(", ")
+            : message;
+
+          return `${field}: ${value}`;
+        })
+        .join(" | ");
+    }
+
+    if (data.detail) {
+      return typeof data.detail ===
+        "string"
+        ? data.detail
+        : JSON.stringify(data.detail);
+    }
+
+    const entries = Object.entries(data);
+
+    if (entries.length > 0) {
+      return entries
+        .map(([field, message]) => {
+          const value = Array.isArray(message)
+            ? message.join(", ")
+            : typeof message === "object"
+              ? JSON.stringify(message)
+              : message;
+
+          return `${field}: ${value}`;
+        })
+        .join(" | ");
+    }
+
+    return "Checkout failed. Please try again.";
+  };
+
+  const validateForm = () => {
+    const requiredFields = [
+      ["shipping_name", "Full name"],
+      ["shipping_phone", "Phone"],
+      ["shipping_address", "Address"],
+      ["shipping_city", "City"],
+      ["shipping_state", "State"],
+      ["shipping_country", "Country"],
+      ["shipping_postal_code", "Postal code"],
+    ];
+
+    for (const [
+      field,
+      label,
+    ] of requiredFields) {
+      if (!form[field].trim()) {
+        setError(
+          `${label} is required.`
+        );
+        return false;
+      }
+    }
+
+    if (
+      form.shipping_phone.trim().length <
+      10
+    ) {
+      setError(
+        "Please enter a valid phone number."
+      );
+      return false;
+    }
+
+    if (
+      form.shipping_postal_code
+        .trim().length < 4
+    ) {
+      setError(
+        "Please enter a valid postal code."
+      );
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    if (loading) {
+      return;
+    }
+
     setError("");
     setSuccess("");
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 1. Create Order
-      const order = await createOrder(form);
+      const cleanedForm = {
+        ...form,
+        shipping_name:
+          form.shipping_name.trim(),
+        shipping_phone:
+          form.shipping_phone.trim(),
+        shipping_address:
+          form.shipping_address.trim(),
+        shipping_city:
+          form.shipping_city.trim(),
+        shipping_state:
+          form.shipping_state.trim(),
+        shipping_country:
+          form.shipping_country.trim(),
+        shipping_postal_code:
+          form.shipping_postal_code.trim(),
+        notes: form.notes.trim(),
+      };
 
-      console.log("ORDER CREATED:", order);
+      // 1. Create order
+      const order =
+        await createOrder(cleanedForm);
 
-      // 2. Create Payment
-      const payment = await createPayment(
-        order.id,
-        paymentMethod
+      console.log(
+        "ORDER CREATED:",
+        order
       );
+
+      if (!order?.id) {
+        throw new Error(
+          "Order was created but no order ID was returned."
+        );
+      }
+
+      // 2. Create payment
+      const payment =
+        await createPayment(
+          order.id,
+          paymentMethod
+        );
 
       console.log(
         "PAYMENT CREATED:",
@@ -59,55 +205,25 @@ function Checkout() {
       );
 
       setSuccess(
-        "Order and payment created successfully."
+        `Order #${order.id} placed successfully.`
       );
 
-      // 3. Go to Orders page
+      // 3. Give the user a moment
+      // to see the success message.
       setTimeout(() => {
-        navigate("/orders");
-      }, 1000);
+        navigate("/orders", {
+          replace: true,
+        });
+      }, 1200);
     } catch (error) {
       console.error(
         "CHECKOUT ERROR:",
         error
       );
 
-      const data = error.response?.data;
-
-      if (data?.missing_fields) {
-        setError(
-          typeof data.missing_fields === "string"
-            ? data.missing_fields
-            : JSON.stringify(
-                data.missing_fields
-              )
-        );
-      } else if (data?.detail) {
-        setError(
-          typeof data.detail === "string"
-            ? data.detail
-            : JSON.stringify(data.detail)
-        );
-      } else if (data) {
-        setError(
-          Object.entries(data)
-            .map(([field, message]) => {
-              const value = Array.isArray(
-                message
-              )
-                ? message.join(", ")
-                : message;
-
-              return `${field}: ${value}`;
-            })
-            .join(" | ")
-        );
-      } else {
-        setError(
-          error.message ||
-            "Order ya payment create nahi ho paaya."
-        );
-      }
+      setError(
+        formatError(error)
+      );
     } finally {
       setLoading(false);
     }
@@ -120,26 +236,36 @@ function Checkout() {
           <h1>Checkout</h1>
 
           <p>
-            Enter your shipping information and
-            choose your payment method.
+            Enter your shipping information
+            and choose your payment method.
           </p>
         </div>
 
         {error && (
-          <div className="auth-error">
+          <div
+            className="auth-error"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
         {success && (
-          <div className="auth-success">
+          <div
+            className="auth-success"
+            role="status"
+            aria-live="polite"
+          >
             {success}
           </div>
         )}
 
         <div className="checkout-layout">
           <section className="checkout-card">
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+            >
               <div className="checkout-section">
                 <h2>
                   Shipping Information
@@ -160,6 +286,8 @@ function Checkout() {
                         form.shipping_name
                       }
                       onChange={handleChange}
+                      autoComplete="name"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -178,6 +306,9 @@ function Checkout() {
                         form.shipping_phone
                       }
                       onChange={handleChange}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -197,6 +328,8 @@ function Checkout() {
                       form.shipping_address
                     }
                     onChange={handleChange}
+                    autoComplete="street-address"
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -216,6 +349,8 @@ function Checkout() {
                         form.shipping_city
                       }
                       onChange={handleChange}
+                      autoComplete="address-level2"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -234,6 +369,8 @@ function Checkout() {
                         form.shipping_state
                       }
                       onChange={handleChange}
+                      autoComplete="address-level1"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -251,6 +388,8 @@ function Checkout() {
                         form.shipping_country
                       }
                       onChange={handleChange}
+                      autoComplete="country-name"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -269,6 +408,9 @@ function Checkout() {
                         form.shipping_postal_code
                       }
                       onChange={handleChange}
+                      autoComplete="postal-code"
+                      inputMode="numeric"
+                      disabled={loading}
                       required
                     />
                   </div>
@@ -286,6 +428,7 @@ function Checkout() {
                     placeholder="Optional"
                     value={form.notes}
                     onChange={handleChange}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -302,13 +445,15 @@ function Checkout() {
                       name="payment_method"
                       value="COD"
                       checked={
-                        paymentMethod === "COD"
+                        paymentMethod ===
+                        "COD"
                       }
                       onChange={(event) =>
                         setPaymentMethod(
                           event.target.value
                         )
                       }
+                      disabled={loading}
                     />
 
                     <div>
@@ -329,6 +474,7 @@ function Checkout() {
                 <Link
                   to="/cart"
                   className="btn btn-secondary"
+                  aria-disabled={loading}
                 >
                   Back to Cart
                 </Link>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getOrders } from "../services/orderService";
@@ -8,32 +8,94 @@ function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await getOrders();
+
+      const orderList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : [];
+
+      setOrders(orderList);
+    } catch (error) {
+      console.error(
+        "ORDERS ERROR:",
+        error
+      );
+
+      setError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "Orders load nahi ho paaye."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadOrders = async () => {
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError("");
+
       try {
         const data = await getOrders();
 
-        setOrders(data.results || data);
-      } catch (error) {
-        console.error("ORDERS ERROR:", error);
+        if (cancelled) {
+          return;
+        }
 
-        setError(
-          error.response?.data?.detail ||
-            error.message ||
-            "Orders load nahi ho paaye."
+        const orderList = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+            ? data.results
+            : [];
+
+        setOrders(orderList);
+      } catch (error) {
+        console.error(
+          "ORDERS ERROR:",
+          error
         );
+
+        if (!cancelled) {
+          setError(
+            error.response?.data?.detail ||
+              error.response?.data?.message ||
+              error.message ||
+              "Orders load nahi ho paaye."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    loadOrders();
+    fetchOrders();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
     return (
       <main className="orders-page">
-        <div className="products-loading">
+        <div
+          className="products-loading"
+          role="status"
+          aria-live="polite"
+        >
           Loading orders...
         </div>
       </main>
@@ -44,13 +106,16 @@ function Orders() {
     return (
       <main className="orders-page">
         <div className="products-empty">
-          <h2>Orders Error</h2>
+          <h2>
+            Unable to Load Orders
+          </h2>
 
           <p>{error}</p>
 
           <button
+            type="button"
             className="btn btn-primary"
-            onClick={() => window.location.reload()}
+            onClick={loadOrders}
           >
             Try Again
           </button>
@@ -64,10 +129,15 @@ function Orders() {
       <div className="orders-container">
         <div className="orders-header">
           <div>
-            <h1>My Orders</h1>
+            <h1>
+              My Orders
+            </h1>
 
             <p>
-              View and track your orders.
+              {orders.length} order
+              {orders.length === 1
+                ? ""
+                : "s"} placed.
             </p>
           </div>
 
@@ -81,14 +151,20 @@ function Orders() {
 
         {orders.length === 0 ? (
           <div className="orders-empty">
-            <div className="orders-empty-icon">
+            <div
+              className="orders-empty-icon"
+              aria-hidden="true"
+            >
               📦
             </div>
 
-            <h2>No Orders Yet</h2>
+            <h2>
+              No Orders Yet
+            </h2>
 
             <p>
-              Your placed orders will appear here.
+              Your placed orders will
+              appear here.
             </p>
 
             <Link
@@ -100,74 +176,110 @@ function Orders() {
           </div>
         ) : (
           <div className="orders-list">
-            {orders.map((order) => (
-              <div
-                className="order-card"
-                key={order.id}
-              >
-                <div className="order-card-header">
-                  <div>
-                    <span>Order Number</span>
+            {orders.map((order) => {
+              const orderNumber =
+                order.order_number ||
+                `#${order.id}`;
 
-                    <strong>
-                      {order.order_number ||
-                        `#${order.id}`}
-                    </strong>
+              const itemCount =
+                Array.isArray(order.items)
+                  ? order.items.length
+                  : Number(
+                      order.item_count || 0
+                    );
+
+              const totalAmount = Number(
+                order.total_amount || 0
+              );
+
+              const orderDate =
+                order.created_at
+                  ? new Date(
+                      order.created_at
+                    ).toLocaleDateString(
+                      "en-IN",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      }
+                    )
+                  : "-";
+
+              const status =
+                order.status ||
+                "PLACED";
+
+              return (
+                <article
+                  className="order-card"
+                  key={order.id}
+                >
+                  <div className="order-card-header">
+                    <div>
+                      <span>
+                        Order Number
+                      </span>
+
+                      <strong>
+                        {orderNumber}
+                      </strong>
+                    </div>
+
+                    <div
+                      className="order-status"
+                      aria-label={`Order status: ${status}`}
+                    >
+                      {status}
+                    </div>
                   </div>
 
-                  <div className="order-status">
-                    {order.status ||
-                      "PLACED"}
+                  <div className="order-card-body">
+                    <div>
+                      <span>
+                        Order Date
+                      </span>
+
+                      <strong>
+                        {orderDate}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Items
+                      </span>
+
+                      <strong>
+                        {itemCount}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Total
+                      </span>
+
+                      <strong>
+                        ₹
+                        {totalAmount.toLocaleString(
+                          "en-IN"
+                        )}
+                      </strong>
+                    </div>
                   </div>
-                </div>
 
-                <div className="order-card-body">
-                  <div>
-                    <span>Order Date</span>
-
-                    <strong>
-                      {order.created_at
-                        ? new Date(
-                            order.created_at
-                          ).toLocaleDateString(
-                            "en-IN"
-                          )
-                        : "-"}
-                    </strong>
+                  <div className="order-card-footer">
+                    <Link
+                      to={`/orders/${order.id}`}
+                      className="btn btn-secondary"
+                    >
+                      View Order
+                    </Link>
                   </div>
-
-                  <div>
-                    <span>Items</span>
-
-                    <strong>
-                      {order.items?.length || 0}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Total</span>
-
-                    <strong>
-                      ₹
-                      {Number(
-                        order.total_amount || 0
-                      ).toLocaleString(
-                        "en-IN"
-                      )}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="order-card-footer">
-                  <Link
-                    to={`/orders/${order.id}`}
-                    className="btn btn-secondary"
-                  >
-                    View Order
-                  </Link>
-                </div>
-              </div>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
