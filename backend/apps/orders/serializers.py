@@ -43,8 +43,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
             "subtotal",
+            "discount_amount",
             "shipping_cost",
             "total_amount",
+            "coupon",
             "shipping_name",
             "shipping_phone",
             "shipping_address",
@@ -64,14 +66,15 @@ class OrderSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
             "subtotal",
+            "discount_amount",
             "shipping_cost",
             "total_amount",
+            "coupon",
             "items",
             "created_at",
             "updated_at",
         )
 
-    # Validate shipping name
     def validate_shipping_name(self, value):
         value = value.strip()
 
@@ -82,7 +85,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping phone
     def validate_shipping_phone(self, value):
         value = value.strip()
 
@@ -93,7 +95,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping address
     def validate_shipping_address(self, value):
         value = value.strip()
 
@@ -104,7 +105,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping city
     def validate_shipping_city(self, value):
         value = value.strip()
 
@@ -115,7 +115,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping state
     def validate_shipping_state(self, value):
         value = value.strip()
 
@@ -126,7 +125,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping country
     def validate_shipping_country(self, value):
         value = value.strip()
 
@@ -137,7 +135,6 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate shipping postal code
     def validate_shipping_postal_code(self, value):
         value = value.strip()
 
@@ -148,6 +145,5 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate optional order notes
     def validate_notes(self, value):
         return value.strip()

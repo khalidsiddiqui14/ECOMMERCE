@@ -1,20 +1,35 @@
 from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 
-from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+)
+from rest_framework import generics, serializers
+from rest_framework.exceptions import (
+    PermissionDenied,
+    ValidationError,
+)
 from rest_framework.permissions import (
     AllowAny,
-    BasePermission,
     IsAuthenticated,
 )
 from rest_framework.response import Response
 
-from apps.orders.models import Order, OrderItem
+from apps.orders.models import OrderItem
 from apps.products.models import Product
 
 from .models import Review
 from .serializers import ReviewSerializer
+
+
+class ProductRatingResponseSerializer(
+    serializers.Serializer
+):
+    product = serializers.IntegerField()
+    product_name = serializers.CharField()
+    average_rating = serializers.FloatField()
+    total_reviews = serializers.IntegerField()
 
 
 class ReviewListCreateView(generics.ListCreateAPIView):
@@ -27,44 +42,39 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         return [AllowAny()]
 
     def get_queryset(self):
-        product_id = self.request.query_params.get(
-            "product"
-        )
-
         queryset = (
             Review.objects
-            .filter(is_active=True)
+            .filter(
+                is_active=True,
+            )
             .select_related(
                 "user",
                 "product",
             )
         )
 
+        product_id = self.request.query_params.get(
+            "product",
+        )
+
         if product_id:
             queryset = queryset.filter(
-                product_id=product_id
+                product_id=product_id,
             )
 
         return queryset
 
     def perform_create(self, serializer):
         user = self.request.user
-
         product = serializer.validated_data["product"]
 
-        # -------------------------------------------------
-        # Product availability
-        # -------------------------------------------------
-
+        # Check product availability.
         if not product.is_active:
             raise ValidationError(
                 "You cannot review an inactive product."
             )
 
-        # -------------------------------------------------
-        # One review per user/product
-        # -------------------------------------------------
-
+        # Prevent duplicate reviews.
         if Review.objects.filter(
             user=user,
             product=product,
@@ -73,10 +83,7 @@ class ReviewListCreateView(generics.ListCreateAPIView):
                 "You have already reviewed this product."
             )
 
-        # -------------------------------------------------
-        # Verify delivered purchase
-        # -------------------------------------------------
-
+        # Verify that the user received the product.
         has_purchased = OrderItem.objects.filter(
             order__user=user,
             order__status="DELIVERED",
@@ -100,6 +107,12 @@ class ReviewDetailView(
 ):
     serializer_class = ReviewSerializer
 
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
 
@@ -111,7 +124,7 @@ class ReviewDetailView(
         # Public users can only see active reviews.
         if not user.is_authenticated:
             return queryset.filter(
-                is_active=True
+                is_active=True,
             )
 
         # Admin can moderate all reviews.
@@ -119,19 +132,34 @@ class ReviewDetailView(
             return queryset
 
         # Normal users can see active reviews.
-        # Ownership is enforced separately for mutations.
         return queryset.filter(
-            is_active=True
+            is_active=True,
         )
 
     def perform_update(self, serializer):
         review = self.get_object()
         user = self.request.user
 
+        # Admin can moderate any review.
         if getattr(user, "role", None) == "ADMIN":
-            serializer.save()
+            is_active = self.request.data.get(
+                "is_active",
+            )
+
+            if is_active is not None:
+                if isinstance(is_active, str):
+                    is_active = (
+                        is_active.lower() == "true"
+                    )
+
+                review.is_active = is_active
+
+            serializer.save(
+                is_active=review.is_active,
+            )
             return
 
+        # Users can only update their own review.
         if review.user_id != user.id:
             raise PermissionDenied(
                 "You can only update your own review."
@@ -139,16 +167,21 @@ class ReviewDetailView(
 
         serializer.save(
             user=user,
-            is_verified_purchase=review.is_verified_purchase,
+            is_verified_purchase=(
+                review.is_verified_purchase
+            ),
+            is_active=review.is_active,
         )
 
     def perform_destroy(self, instance):
         user = self.request.user
 
+        # Admin can delete any review.
         if getattr(user, "role", None) == "ADMIN":
             instance.delete()
             return
 
+        # Users can only delete their own review.
         if instance.user_id != user.id:
             raise PermissionDenied(
                 "You can only delete your own review."
@@ -158,9 +191,25 @@ class ReviewDetailView(
 
 
 class ProductRatingView(generics.RetrieveAPIView):
+    serializer_class = (
+        ProductRatingResponseSerializer
+    )
     permission_classes = [AllowAny]
 
-    def retrieve(self, request, *args, **kwargs):
+    @extend_schema(
+        responses={
+            200: ProductRatingResponseSerializer,
+            404: OpenApiResponse(
+                description="Product not found.",
+            ),
+        },
+    )
+    def retrieve(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
         product = get_object_or_404(
             Product,
             id=kwargs["product_id"],

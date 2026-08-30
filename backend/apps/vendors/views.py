@@ -4,27 +4,39 @@ from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 
-from apps.core.permissions import IsVendor
 from .models import Vendor
+from .permissions import IsVendor, IsVendorUser
 from .serializers import VendorSerializer
 
 
 class VendorCreateView(generics.CreateAPIView):
     serializer_class = VendorSerializer
-    permission_classes = [IsAuthenticated, IsVendor]
+    permission_classes = [
+        IsAuthenticated,
+        IsVendorUser,
+    ]
 
     def perform_create(self, serializer):
-        if Vendor.objects.filter(user=self.request.user).exists():
+        if Vendor.objects.filter(
+            user=self.request.user,
+        ).exists():
             raise ValidationError(
                 "Vendor profile already exists."
             )
 
-        serializer.save(user=self.request.user)
+        serializer.save(
+            user=self.request.user,
+        )
 
 
-class VendorDetailView(generics.RetrieveUpdateAPIView):
+class VendorDetailView(
+    generics.RetrieveUpdateAPIView
+):
     serializer_class = VendorSerializer
-    permission_classes = [IsAuthenticated, IsVendor]
+    permission_classes = [
+        IsAuthenticated,
+        IsVendor,
+    ]
 
     def get_object(self):
         return get_object_or_404(

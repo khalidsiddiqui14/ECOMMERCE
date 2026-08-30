@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -9,8 +10,6 @@ User = get_user_model()
 
 
 class BrandAPITestCase(APITestCase):
-
-    # Create test users and brands
     def setUp(self):
         self.customer = User.objects.create_user(
             username="customer",
@@ -40,9 +39,20 @@ class BrandAPITestCase(APITestCase):
             is_active=False,
         )
 
-    # Test public users can list active brands
+    def authenticate_admin(self):
+        self.client.force_authenticate(
+            user=self.admin,
+        )
+
+    def authenticate_customer(self):
+        self.client.force_authenticate(
+            user=self.customer,
+        )
+
     def test_public_can_list_active_brands(self):
-        response = self.client.get("/api/brands/")
+        response = self.client.get(
+            "/api/brands/"
+        )
 
         self.assertEqual(
             response.status_code,
@@ -59,13 +69,37 @@ class BrandAPITestCase(APITestCase):
             "Samsung",
         )
 
-    # Test admin can list all brands
-    def test_admin_can_list_all_brands(self):
-        self.client.force_authenticate(
-            user=self.admin,
+    def test_public_can_retrieve_active_brand(self):
+        response = self.client.get(
+            f"/api/brands/{self.active_brand.id}/"
         )
 
-        response = self.client.get("/api/brands/")
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["name"],
+            "Samsung",
+        )
+
+    def test_public_cannot_retrieve_inactive_brand(self):
+        response = self.client.get(
+            f"/api/brands/{self.inactive_brand.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_admin_can_list_all_brands(self):
+        self.authenticate_admin()
+
+        response = self.client.get(
+            "/api/brands/"
+        )
 
         self.assertEqual(
             response.status_code,
@@ -77,11 +111,25 @@ class BrandAPITestCase(APITestCase):
             2,
         )
 
-    # Test admin can create a brand
-    def test_admin_can_create_brand(self):
-        self.client.force_authenticate(
-            user=self.admin,
+    def test_admin_can_retrieve_inactive_brand(self):
+        self.authenticate_admin()
+
+        response = self.client.get(
+            f"/api/brands/{self.inactive_brand.id}/"
         )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["name"],
+            "Old Brand",
+        )
+
+    def test_admin_can_create_brand(self):
+        self.authenticate_admin()
 
         response = self.client.post(
             "/api/brands/",
@@ -105,11 +153,35 @@ class BrandAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test customer cannot create a brand
-    def test_customer_cannot_create_brand(self):
-        self.client.force_authenticate(
-            user=self.customer,
+    def test_admin_can_create_brand_without_slug(self):
+        self.authenticate_admin()
+
+        response = self.client.post(
+            "/api/brands/",
+            {
+                "name": "Sony",
+                "description": "Electronics brand",
+                "is_active": True,
+            },
+            format="json",
         )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        brand = Brand.objects.get(
+            name="Sony",
+        )
+
+        self.assertEqual(
+            brand.slug,
+            "sony",
+        )
+
+    def test_customer_cannot_create_brand(self):
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/brands/",
@@ -127,7 +199,6 @@ class BrandAPITestCase(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    # Test unauthenticated users cannot create a brand
     def test_unauthenticated_user_cannot_create_brand(self):
         response = self.client.post(
             "/api/brands/",
@@ -145,11 +216,8 @@ class BrandAPITestCase(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    # Test admin can update a brand
     def test_admin_can_update_brand(self):
-        self.client.force_authenticate(
-            user=self.admin,
-        )
+        self.authenticate_admin()
 
         response = self.client.patch(
             f"/api/brands/{self.active_brand.id}/",
@@ -171,11 +239,8 @@ class BrandAPITestCase(APITestCase):
             "Samsung Electronics",
         )
 
-    # Test customer cannot update a brand
     def test_customer_cannot_update_brand(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.patch(
             f"/api/brands/{self.active_brand.id}/",
@@ -190,11 +255,8 @@ class BrandAPITestCase(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    # Test admin can delete a brand
     def test_admin_can_delete_brand(self):
-        self.client.force_authenticate(
-            user=self.admin,
-        )
+        self.authenticate_admin()
 
         response = self.client.delete(
             f"/api/brands/{self.active_brand.id}/",
@@ -211,11 +273,26 @@ class BrandAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test brand name validation
-    def test_brand_name_requires_two_characters(self):
-        self.client.force_authenticate(
-            user=self.admin,
+    def test_customer_cannot_delete_brand(self):
+        self.authenticate_customer()
+
+        response = self.client.delete(
+            f"/api/brands/{self.active_brand.id}/",
         )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+        self.assertTrue(
+            Brand.objects.filter(
+                id=self.active_brand.id,
+            ).exists()
+        )
+
+    def test_brand_name_requires_two_characters(self):
+        self.authenticate_admin()
 
         response = self.client.post(
             "/api/brands/",
@@ -233,11 +310,8 @@ class BrandAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test duplicate brand name is rejected
     def test_duplicate_brand_name_is_rejected(self):
-        self.client.force_authenticate(
-            user=self.admin,
-        )
+        self.authenticate_admin()
 
         response = self.client.post(
             "/api/brands/",
@@ -255,11 +329,8 @@ class BrandAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test duplicate brand slug is rejected
     def test_duplicate_brand_slug_is_rejected(self):
-        self.client.force_authenticate(
-            user=self.admin,
-        )
+        self.authenticate_admin()
 
         response = self.client.post(
             "/api/brands/",
@@ -267,6 +338,81 @@ class BrandAPITestCase(APITestCase):
                 "name": "New Samsung",
                 "slug": "samsung",
                 "description": "Duplicate slug",
+                "is_active": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_brand_name_is_trimmed(self):
+        self.authenticate_admin()
+
+        response = self.client.post(
+            "/api/brands/",
+            {
+                "name": "  Sony  ",
+                "slug": "sony",
+                "description": "Electronics brand",
+                "is_active": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        brand = Brand.objects.get(
+            slug="sony",
+        )
+
+        self.assertEqual(
+            brand.name,
+            "Sony",
+        )
+
+    def test_brand_slug_is_normalized(self):
+        self.authenticate_admin()
+
+        response = self.client.post(
+            "/api/brands/",
+            {
+                "name": "LG",
+                "slug": "  LG  ",
+                "description": "Electronics brand",
+                "is_active": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        brand = Brand.objects.get(
+            name="LG",
+        )
+
+        self.assertEqual(
+            brand.slug,
+            "lg",
+        )
+
+    def test_invalid_brand_slug_is_rejected(self):
+        self.authenticate_admin()
+
+        response = self.client.post(
+            "/api/brands/",
+            {
+                "name": "Invalid Brand",
+                "slug": "invalid slug",
+                "description": "Invalid slug",
                 "is_active": True,
             },
             format="json",

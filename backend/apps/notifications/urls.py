@@ -25,8 +25,8 @@ urlpatterns = [
         name="notification-mark-read",
     ),
     path(
-    "preferences/",
-    NotificationPreferenceView.as_view(),
-    name="notification-preferences",
+        "preferences/",
+        NotificationPreferenceView.as_view(),
+        name="notification-preferences",
     ),
 ]

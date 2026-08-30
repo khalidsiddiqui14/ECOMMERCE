@@ -1,6 +1,12 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiTypes,
+    extend_schema,
+)
+
 from rest_framework import status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -13,9 +19,9 @@ from .serializers import CartSerializer
 
 
 class CartViewSet(viewsets.ViewSet):
+    serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
 
-    # Get or create the authenticated user's cart
     def get_cart(self, user):
         cart, _ = Cart.objects.get_or_create(
             user=user,
@@ -23,7 +29,6 @@ class CartViewSet(viewsets.ViewSet):
 
         return cart
 
-    # Validate and normalize cart quantity
     def get_quantity(self, value, required=True):
         if value is None:
             if required:
@@ -59,7 +64,6 @@ class CartViewSet(viewsets.ViewSet):
 
         return quantity
 
-    # Validate that a product can be purchased
     def validate_product(self, product):
         if not product.is_active:
             raise ValidationError(
@@ -90,16 +94,15 @@ class CartViewSet(viewsets.ViewSet):
                 }
             )
 
-    # Return the authenticated user's cart
-    def list(self, request):
+    def get_serialized_cart(self, cart, request):
         cart = (
             Cart.objects
             .prefetch_related(
                 "items__product",
             )
-            .get_or_create(
-                user=request.user,
-            )[0]
+            .get(
+                pk=cart.pk,
+            )
         )
 
         serializer = CartSerializer(
@@ -109,12 +112,21 @@ class CartViewSet(viewsets.ViewSet):
             },
         )
 
+        return serializer.data
+
+    def list(self, request):
+        cart = self.get_cart(
+            request.user,
+        )
+
         return Response(
-            serializer.data,
+            self.get_serialized_cart(
+                cart,
+                request,
+            ),
             status=status.HTTP_200_OK,
         )
 
-    # Add a product to the authenticated user's cart
     @transaction.atomic
     def create(self, request):
         cart = self.get_cart(
@@ -135,12 +147,17 @@ class CartViewSet(viewsets.ViewSet):
             )
 
         quantity = self.get_quantity(
-            request.data.get("quantity", 1),
+            request.data.get(
+                "quantity",
+                1,
+            ),
             required=False,
         )
 
         product = get_object_or_404(
-            Product.objects.select_related(
+            Product.objects
+            .select_for_update()
+            .select_related(
                 "store",
                 "category",
                 "brand",
@@ -198,31 +215,30 @@ class CartViewSet(viewsets.ViewSet):
                 quantity=quantity,
             )
 
-        cart.refresh_from_db()
-
-        cart = (
-            Cart.objects
-            .prefetch_related(
-                "items__product",
-            )
-            .get(
-                pk=cart.pk,
-            )
-        )
-
-        serializer = CartSerializer(
-            cart,
-            context={
-                "request": request,
-            },
+        cart.save(
+            update_fields=[
+                "updated_at",
+            ],
         )
 
         return Response(
-            serializer.data,
+            self.get_serialized_cart(
+                cart,
+                request,
+            ),
             status=status.HTTP_201_CREATED,
         )
 
-    # Update the quantity of a cart item
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+            ),
+        ],
+    )
     @transaction.atomic
     def update(self, request, pk=None):
         cart = self.get_cart(
@@ -231,10 +247,10 @@ class CartViewSet(viewsets.ViewSet):
 
         item = get_object_or_404(
             CartItem.objects
+            .select_for_update()
             .select_related(
                 "product",
-            )
-            .select_for_update(),
+            ),
             id=pk,
             cart=cart,
         )
@@ -243,7 +259,13 @@ class CartViewSet(viewsets.ViewSet):
             request.data.get("quantity"),
         )
 
-        product = item.product
+        product = (
+            Product.objects
+            .select_for_update()
+            .get(
+                pk=item.product_id,
+            )
+        )
 
         self.validate_product(
             product,
@@ -268,29 +290,30 @@ class CartViewSet(viewsets.ViewSet):
             ],
         )
 
-        cart = (
-            Cart.objects
-            .prefetch_related(
-                "items__product",
-            )
-            .get(
-                pk=cart.pk,
-            )
-        )
-
-        serializer = CartSerializer(
-            cart,
-            context={
-                "request": request,
-            },
+        cart.save(
+            update_fields=[
+                "updated_at",
+            ],
         )
 
         return Response(
-            serializer.data,
+            self.get_serialized_cart(
+                cart,
+                request,
+            ),
             status=status.HTTP_200_OK,
         )
 
-    # Remove a product from the authenticated user's cart
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+            ),
+        ],
+    )
     @transaction.atomic
     def destroy(self, request, pk=None):
         cart = self.get_cart(
@@ -304,6 +327,12 @@ class CartViewSet(viewsets.ViewSet):
         )
 
         item.delete()
+
+        cart.save(
+            update_fields=[
+                "updated_at",
+            ],
+        )
 
         return Response(
             {

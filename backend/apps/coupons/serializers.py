@@ -1,5 +1,3 @@
-from django.utils import timezone
-
 from rest_framework import serializers
 
 from .models import Coupon
@@ -65,6 +63,20 @@ class CouponSerializer(serializers.ModelSerializer):
                 "Coupon code must contain at least 3 characters."
             )
 
+        queryset = Coupon.objects.filter(
+            code__iexact=value,
+        )
+
+        if self.instance:
+            queryset = queryset.exclude(
+                pk=self.instance.pk,
+            )
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A coupon with this code already exists."
+            )
+
         return value
 
     def validate_discount_value(self, value):
@@ -107,22 +119,6 @@ class CouponSerializer(serializers.ModelSerializer):
 
         return value
 
-    def validate_start_date(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                "Start date is required."
-            )
-
-        return value
-
-    def validate_end_date(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                "End date is required."
-            )
-
-        return value
-
     def validate(self, attrs):
         discount_type = attrs.get(
             "discount_type",
@@ -138,24 +134,6 @@ class CouponSerializer(serializers.ModelSerializer):
             getattr(
                 self.instance,
                 "discount_value",
-                None,
-            ),
-        )
-
-        minimum_order_amount = attrs.get(
-            "minimum_order_amount",
-            getattr(
-                self.instance,
-                "minimum_order_amount",
-                None,
-            ),
-        )
-
-        maximum_discount_amount = attrs.get(
-            "maximum_discount_amount",
-            getattr(
-                self.instance,
-                "maximum_discount_amount",
                 None,
             ),
         )
@@ -202,23 +180,6 @@ class CouponSerializer(serializers.ModelSerializer):
                     "discount_value": (
                         "Percentage discount cannot "
                         "exceed 100."
-                    )
-                }
-            )
-
-        if (
-            maximum_discount_amount is not None
-            and minimum_order_amount is not None
-            and maximum_discount_amount > 0
-            and minimum_order_amount > 0
-            and discount_type == "FIXED"
-            and discount_value > minimum_order_amount
-        ):
-            raise serializers.ValidationError(
-                {
-                    "discount_value": (
-                        "Fixed discount cannot exceed "
-                        "minimum order amount."
                     )
                 }
             )

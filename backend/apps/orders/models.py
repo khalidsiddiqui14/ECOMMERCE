@@ -56,6 +56,15 @@ class Order(models.Model):
         ],
     )
 
+    discount_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+        ],
+    )
+
     shipping_cost = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -71,6 +80,14 @@ class Order(models.Model):
         validators=[
             MinValueValidator(Decimal("0.00")),
         ],
+    )
+
+    coupon = models.ForeignKey(
+        "coupons.Coupon",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
     )
 
     shipping_name = models.CharField(

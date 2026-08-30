@@ -1,7 +1,14 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
-from rest_framework import status, viewsets
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiTypes,
+    extend_schema,
+)
+from rest_framework import serializers, status, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,7 +19,16 @@ from .models import Wishlist, WishlistItem
 from .serializers import WishlistSerializer
 
 
+class WishlistCreateRequestSerializer(
+    serializers.Serializer
+):
+    product = serializers.IntegerField(
+        required=True,
+    )
+
+
 class WishlistViewSet(viewsets.ViewSet):
+    serializer_class = WishlistSerializer
     permission_classes = [IsAuthenticated]
 
     # Get or create the authenticated user's wishlist
@@ -24,6 +40,11 @@ class WishlistViewSet(viewsets.ViewSet):
         return wishlist
 
     # Return the authenticated user's wishlist
+    @extend_schema(
+        responses={
+            200: WishlistSerializer,
+        },
+    )
     def list(self, request):
         wishlist = (
             Wishlist.objects
@@ -48,6 +69,26 @@ class WishlistViewSet(viewsets.ViewSet):
         )
 
     # Add a product to the authenticated user's wishlist
+    @extend_schema(
+        request=WishlistCreateRequestSerializer,
+        responses={
+            201: WishlistSerializer,
+            400: OpenApiResponse(
+                description=(
+                    "Invalid or unavailable product."
+                ),
+            ),
+        },
+        examples=[
+            OpenApiExample(
+                "Add Product",
+                request_only=True,
+                value={
+                    "product": 1,
+                },
+            ),
+        ],
+    )
     @transaction.atomic
     def create(self, request):
         wishlist = self.get_wishlist(
@@ -136,6 +177,28 @@ class WishlistViewSet(viewsets.ViewSet):
         )
 
     # Remove a product from the authenticated user's wishlist
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                description=(
+                    "Product removed from wishlist."
+                ),
+            ),
+            404: OpenApiResponse(
+                description=(
+                    "Wishlist item not found."
+                ),
+            ),
+        },
+    )
     @transaction.atomic
     def destroy(self, request, pk=None):
         wishlist = self.get_wishlist(

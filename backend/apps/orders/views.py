@@ -13,6 +13,7 @@ from rest_framework.response import Response
 
 from apps.cart.models import Cart
 from apps.core.permissions import IsVendor
+from apps.coupons.models import Coupon
 from apps.products.models import Product
 
 from .models import Order, OrderItem
@@ -23,7 +24,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
-    # Search
     search_fields = [
         "order_number",
         "shipping_name",
@@ -31,13 +31,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         "shipping_city",
     ]
 
-    # Filtering
     filterset_fields = [
         "status",
         "payment_status",
     ]
 
-    # Ordering
     ordering_fields = [
         "created_at",
         "total_amount",
@@ -58,6 +56,13 @@ class OrderViewSet(viewsets.ModelViewSet):
     ]
 
     def get_queryset(self):
+        if getattr(
+            self,
+            "swagger_fake_view",
+            False,
+        ):
+            return Order.objects.none()
+
         return (
             Order.objects
             .filter(
@@ -173,9 +178,98 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         shipping_cost = Decimal("0.00")
 
-        total_amount = (
-            subtotal + shipping_cost
+        coupon = None
+        discount_amount = Decimal("0.00")
+
+        coupon_code = request.data.get(
+            "coupon",
         )
+
+        if coupon_code:
+            coupon = (
+                Coupon.objects
+                .select_for_update()
+                .filter(
+                    code=coupon_code.strip().upper(),
+                )
+                .first()
+            )
+
+            if coupon is None:
+                raise ValidationError(
+                    {
+                        "coupon": "Invalid coupon code.",
+                    }
+                )
+
+            if not coupon.is_valid:
+                raise ValidationError(
+                    {
+                        "coupon": (
+                            "This coupon is no longer valid."
+                        ),
+                    }
+                )
+
+            previous_user_usage = Order.objects.filter(
+                user=request.user,
+                coupon=coupon,
+            ).count()
+
+            if previous_user_usage >= coupon.per_user_limit:
+                raise ValidationError(
+                    {
+                        "coupon": (
+                            "You have reached the usage "
+                            "limit for this coupon."
+                        ),
+                    }
+                )
+
+            if (
+                coupon.usage_limit is not None
+                and coupon.used_count >= coupon.usage_limit
+            ):
+                raise ValidationError(
+                    {
+                        "coupon": (
+                            "This coupon usage limit "
+                            "has been reached."
+                        ),
+                    }
+                )
+
+            discount_amount = coupon.calculate_discount(
+                subtotal,
+            )
+
+            if discount_amount <= Decimal("0.00"):
+                raise ValidationError(
+                    {
+                        "coupon": (
+                            "Coupon cannot be applied "
+                            "to this order."
+                        ),
+                    }
+                )
+
+            coupon.used_count += 1
+
+            coupon.save(
+                update_fields=[
+                    "used_count",
+                    "updated_at",
+                ],
+            )
+
+        total_amount = (
+            subtotal
+            + shipping_cost
+            - discount_amount
+        )
+
+        if total_amount < Decimal("0.00"):
+            total_amount = Decimal("0.00")
 
         order = Order.objects.create(
             user=request.user,
@@ -183,8 +277,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             status="PENDING",
             payment_status="PENDING",
             subtotal=subtotal,
+            discount_amount=discount_amount,
             shipping_cost=shipping_cost,
             total_amount=total_amount,
+            coupon=coupon,
             shipping_name=serializer.validated_data[
                 "shipping_name"
             ],
@@ -534,7 +630,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             orders.values()
         )
 
-        # Pagination for vendor orders
         page = self.paginate_queryset(
             orders
         )

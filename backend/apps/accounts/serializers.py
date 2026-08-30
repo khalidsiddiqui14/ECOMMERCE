@@ -74,24 +74,26 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
-    # Authenticate the user with email and password
     def validate(self, attrs):
         email = attrs.get("email")
         password = attrs.get("password")
 
-        user = authenticate(
-            username=email,
-            password=password,
-        )
+        user = User.objects.filter(
+            email__iexact=email
+        ).first()
 
         if not user:
             raise serializers.ValidationError(
                 "Invalid email or password."
             )
 
+        if not user.check_password(password):
+            raise serializers.ValidationError(
+                "Invalid email or password."
+            )
+
         attrs["user"] = user
         return attrs
-
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

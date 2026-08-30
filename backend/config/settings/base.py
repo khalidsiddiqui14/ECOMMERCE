@@ -1,21 +1,34 @@
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
+
 
 # Project root directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 load_dotenv(BASE_DIR / ".env")
+
 
 # Django secret key
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "django-insecure-development-only-change-me",
+    "development-secret-key-change-this-in-local-environment-2026",
 )
 
-# Enable debug mode only for development
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
-# Allowed hostnames for the application
+# Debug is disabled by default.
+# development.py explicitly enables it.
+DEBUG = (
+    os.environ.get(
+        "DJANGO_DEBUG",
+        "False",
+    ).lower()
+    == "true"
+)
+
+
+# Allowed hostnames
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
@@ -24,6 +37,7 @@ ALLOWED_HOSTS = [
     ).split(",")
     if host.strip()
 ]
+
 
 # Installed Django and third-party applications
 INSTALLED_APPS = [
@@ -38,6 +52,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "django_filters",
     "corsheaders",
+    "drf_spectacular",
 
     "apps.accounts",
     "apps.vendors",
@@ -54,10 +69,10 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.core",
     "apps.addresses",
-    "drf_spectacular",
 ]
 
-# Middleware for security, sessions, authentication and CORS
+
+# Middleware
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -69,14 +84,15 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+
 # Root URL configuration
 ROOT_URLCONF = "config.urls"
 
-# WSGI application for production servers
-WSGI_APPLICATION = "config.wsgi.application"
 
-# ASGI application for asynchronous servers
+# WSGI / ASGI applications
+WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+
 
 # Django template configuration
 TEMPLATES = [
@@ -94,8 +110,11 @@ TEMPLATES = [
     },
 ]
 
-# Configure database from environment or use SQLite locally
-DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Database configuration
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+)
 
 if DATABASE_URL:
     import dj_database_url
@@ -114,7 +133,8 @@ else:
         }
     }
 
-# Password validation rules
+
+# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": (
@@ -142,27 +162,38 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization settings
+
+# Internationalization
 LANGUAGE_CODE = "en-us"
+
 TIME_ZONE = "UTC"
+
 USE_I18N = True
+
 USE_TZ = True
 
-# Static files configuration
+
+# Static files
 STATIC_URL = "/static/"
+
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Media files configuration
+
+# Media files
 MEDIA_URL = "/media/"
+
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Default primary key field type
+
+# Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
 
-# Django REST Framework configuration
+
+# Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -179,29 +210,33 @@ REST_FRAMEWORK = {
         "rest_framework.pagination.PageNumberPagination"
     ),
     "PAGE_SIZE": 10,
-    "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    "EXCEPTION_HANDLER": (
+        "config.exceptions.custom_exception_handler"
+    ),
     "DEFAULT_SCHEMA_CLASS": (
-    "drf_spectacular.openapi.AutoSchema"
+        "drf_spectacular.openapi.AutoSchema"
     ),
 }
+
+
+# OpenAPI / Swagger
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ecommerce API",
     "DESCRIPTION": "Production Ecommerce REST API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 
-    # JWT authentication
     "AUTHENTICATION_WHITELIST": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
 
-    # Swagger UI settings
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
     },
 }
 
-# Allowed frontend origins
+
+# CORS
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
@@ -213,10 +248,17 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+
 # Basic security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
 X_FRAME_OPTIONS = "DENY"
+
+
+# Custom test runner
 TEST_RUNNER = "config.test_runner.CustomTestRunner"
+
+
 # Application logging
 LOGGING = {
     "version": 1,
@@ -230,9 +272,7 @@ LOGGING = {
             "style": "{",
         },
         "simple": {
-            "format": (
-                "{levelname} {message}"
-            ),
+            "format": "{levelname} {message}",
             "style": "{",
         },
     },

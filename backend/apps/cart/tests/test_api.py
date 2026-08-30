@@ -11,12 +11,11 @@ from apps.vendors.models import Vendor
 
 from apps.cart.models import Cart, CartItem
 
+
 User = get_user_model()
 
 
 class CartAPITestCase(APITestCase):
-
-    # Create test users, vendor data and products
     def setUp(self):
         self.customer = User.objects.create_user(
             username="customer",
@@ -106,7 +105,11 @@ class CartAPITestCase(APITestCase):
             user=self.customer,
         )
 
-    # Test unauthenticated users cannot access carts
+    def authenticate_customer(self):
+        self.client.force_authenticate(
+            user=self.customer,
+        )
+
     def test_unauthenticated_user_cannot_access_cart(self):
         response = self.client.get(
             "/api/cart/",
@@ -117,11 +120,8 @@ class CartAPITestCase(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    # Test authenticated user can view their cart
     def test_user_can_view_own_cart(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.get(
             "/api/cart/",
@@ -137,7 +137,6 @@ class CartAPITestCase(APITestCase):
             self.customer.id,
         )
 
-    # Test cart is created automatically for authenticated user
     def test_cart_is_created_automatically(self):
         self.client.force_authenticate(
             user=self.other_customer,
@@ -164,11 +163,8 @@ class CartAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test user can add product to cart
     def test_user_can_add_product_to_cart(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -194,11 +190,8 @@ class CartAPITestCase(APITestCase):
             2,
         )
 
-    # Test adding same product increases quantity
     def test_adding_same_product_increases_quantity(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         CartItem.objects.create(
             cart=self.cart,
@@ -230,11 +223,16 @@ class CartAPITestCase(APITestCase):
             5,
         )
 
-    # Test quantity cannot exceed available stock
-    def test_quantity_cannot_exceed_stock(self):
-        self.client.force_authenticate(
-            user=self.customer,
+        self.assertEqual(
+            CartItem.objects.filter(
+                cart=self.cart,
+                product=self.product,
+            ).count(),
+            1,
         )
+
+    def test_quantity_cannot_exceed_available_stock(self):
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -257,11 +255,41 @@ class CartAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test zero quantity is rejected
-    def test_zero_quantity_is_rejected(self):
-        self.client.force_authenticate(
-            user=self.customer,
+    def test_existing_quantity_plus_new_quantity_cannot_exceed_stock(self):
+        self.authenticate_customer()
+
+        CartItem.objects.create(
+            cart=self.cart,
+            product=self.product,
+            quantity=8,
         )
+
+        response = self.client.post(
+            "/api/cart/",
+            {
+                "product": self.product.id,
+                "quantity": 3,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        item = CartItem.objects.get(
+            cart=self.cart,
+            product=self.product,
+        )
+
+        self.assertEqual(
+            item.quantity,
+            8,
+        )
+
+    def test_zero_quantity_is_rejected(self):
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -277,11 +305,8 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test negative quantity is rejected
     def test_negative_quantity_is_rejected(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -297,11 +322,8 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test invalid quantity is rejected
     def test_invalid_quantity_is_rejected(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -317,16 +339,46 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test inactive product cannot be added
+    def test_missing_product_is_rejected(self):
+        self.authenticate_customer()
+
+        response = self.client.post(
+            "/api/cart/",
+            {
+                "quantity": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_nonexistent_product_is_rejected(self):
+        self.authenticate_customer()
+
+        response = self.client.post(
+            "/api/cart/",
+            {
+                "product": 999999,
+                "quantity": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
     def test_inactive_product_cannot_be_added(self):
         self.product.is_active = False
         self.product.save(
             update_fields=["is_active"],
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -342,16 +394,13 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test draft product cannot be added
     def test_draft_product_cannot_be_added(self):
         self.product.status = "DRAFT"
         self.product.save(
             update_fields=["status"],
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -367,7 +416,6 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test out of stock product cannot be added
     def test_out_of_stock_product_cannot_be_added(self):
         self.product.stock = 0
         self.product.status = "OUT_OF_STOCK"
@@ -379,9 +427,7 @@ class CartAPITestCase(APITestCase):
             ],
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.post(
             "/api/cart/",
@@ -397,11 +443,8 @@ class CartAPITestCase(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test user can update cart item quantity
     def test_user_can_update_cart_item(self):
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         item = CartItem.objects.create(
             cart=self.cart,
@@ -429,40 +472,64 @@ class CartAPITestCase(APITestCase):
             5,
         )
 
-    # Test user cannot update another user's cart item
-    def test_user_cannot_update_other_users_cart_item(self):
-        other_cart = Cart.objects.create(
-            user=self.other_customer,
-        )
+    def test_update_requires_quantity(self):
+        self.authenticate_customer()
 
         item = CartItem.objects.create(
-            cart=other_cart,
+            cart=self.cart,
             product=self.product,
             quantity=2,
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
+        response = self.client.put(
+            f"/api/cart/{item.id}/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        item.refresh_from_db()
+
+        self.assertEqual(
+            item.quantity,
+            2,
+        )
+
+    def test_update_zero_quantity_is_rejected(self):
+        self.authenticate_customer()
+
+        item = CartItem.objects.create(
+            cart=self.cart,
+            product=self.product,
+            quantity=2,
         )
 
         response = self.client.put(
             f"/api/cart/{item.id}/",
             {
-                "quantity": 5,
+                "quantity": 0,
             },
             format="json",
         )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_404_NOT_FOUND,
+            status.HTTP_400_BAD_REQUEST,
         )
 
-    # Test updated quantity cannot exceed stock
-    def test_updated_quantity_cannot_exceed_stock(self):
-        self.client.force_authenticate(
-            user=self.customer,
+        item.refresh_from_db()
+
+        self.assertEqual(
+            item.quantity,
+            2,
         )
+
+    def test_updated_quantity_cannot_exceed_stock(self):
+        self.authenticate_customer()
 
         item = CartItem.objects.create(
             cart=self.cart,
@@ -490,11 +557,50 @@ class CartAPITestCase(APITestCase):
             2,
         )
 
-    # Test user can remove cart item
-    def test_user_can_remove_cart_item(self):
-        self.client.force_authenticate(
-            user=self.customer,
+    def test_user_cannot_update_other_users_cart_item(self):
+        other_cart = Cart.objects.create(
+            user=self.other_customer,
         )
+
+        item = CartItem.objects.create(
+            cart=other_cart,
+            product=self.product,
+            quantity=2,
+        )
+
+        self.authenticate_customer()
+
+        response = self.client.put(
+            f"/api/cart/{item.id}/",
+            {
+                "quantity": 5,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_update_nonexistent_cart_item_returns_404(self):
+        self.authenticate_customer()
+
+        response = self.client.put(
+            "/api/cart/999999/",
+            {
+                "quantity": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_user_can_remove_cart_item(self):
+        self.authenticate_customer()
 
         item = CartItem.objects.create(
             cart=self.cart,
@@ -517,7 +623,6 @@ class CartAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test user cannot remove another user's cart item
     def test_user_cannot_remove_other_users_cart_item(self):
         other_cart = Cart.objects.create(
             user=self.other_customer,
@@ -529,9 +634,7 @@ class CartAPITestCase(APITestCase):
             quantity=2,
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
-        )
+        self.authenticate_customer()
 
         response = self.client.delete(
             f"/api/cart/{item.id}/",
@@ -548,11 +651,20 @@ class CartAPITestCase(APITestCase):
             ).exists()
         )
 
-    # Test cart total price is calculated correctly
-    def test_cart_total_price_is_calculated_correctly(self):
-        self.client.force_authenticate(
-            user=self.customer,
+    def test_delete_nonexistent_cart_item_returns_404(self):
+        self.authenticate_customer()
+
+        response = self.client.delete(
+            "/api/cart/999999/",
         )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_cart_total_price_is_calculated_correctly(self):
+        self.authenticate_customer()
 
         CartItem.objects.create(
             cart=self.cart,
@@ -580,36 +692,47 @@ class CartAPITestCase(APITestCase):
             "12497.00",
         )
 
-    # Test duplicate cart items are prevented
-    def test_duplicate_cart_item_is_prevented(self):
+    def test_cart_items_return_product_information(self):
+        self.authenticate_customer()
+
         CartItem.objects.create(
             cart=self.cart,
             product=self.product,
-            quantity=1,
+            quantity=2,
         )
 
-        self.client.force_authenticate(
-            user=self.customer,
-        )
-
-        response = self.client.post(
+        response = self.client.get(
             "/api/cart/",
-            {
-                "product": self.product.id,
-                "quantity": 1,
-            },
-            format="json",
         )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_201_CREATED,
+            status.HTTP_200_OK,
+        )
+
+        item = response.data["items"][0]
+
+        self.assertEqual(
+            item["product"],
+            self.product.id,
         )
 
         self.assertEqual(
-            CartItem.objects.filter(
-                cart=self.cart,
-                product=self.product,
-            ).count(),
-            1,
+            item["product_name"],
+            "Smart Watch",
+        )
+
+        self.assertEqual(
+            item["price"],
+            "4999.00",
+        )
+
+        self.assertEqual(
+            item["quantity"],
+            2,
+        )
+
+        self.assertEqual(
+            item["total_price"],
+            "9998.00",
         )

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 
 
 class Address(models.Model):
@@ -75,6 +75,20 @@ class Address(models.Model):
                 name="unique_default_address_per_user",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.is_default:
+                Address.objects.filter(
+                    user=self.user,
+                    is_default=True,
+                ).exclude(
+                    pk=self.pk
+                ).update(
+                    is_default=False
+                )
+
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.full_name} - {self.city}"

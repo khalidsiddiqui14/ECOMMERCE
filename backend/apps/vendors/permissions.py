@@ -1,9 +1,21 @@
 from rest_framework.permissions import BasePermission
 
+from .models import Vendor
+
+
+class IsVendorUser(BasePermission):
+
+    # Allow authenticated users with the vendor role.
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        return request.user.role == "VENDOR"
+
 
 class IsVendor(BasePermission):
 
-    # Allow access only to active vendor users
+    # Allow access only to active vendor users.
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
@@ -11,7 +23,7 @@ class IsVendor(BasePermission):
         if request.user.role != "VENDOR":
             return False
 
-        if not hasattr(request.user, "vendor"):
-            return False
-
-        return request.user.vendor.is_active
+        return Vendor.objects.filter(
+            user=request.user,
+            is_active=True,
+        ).exists()

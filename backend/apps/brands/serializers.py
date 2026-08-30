@@ -4,6 +4,11 @@ from .models import Brand
 
 
 class BrandSerializer(serializers.ModelSerializer):
+    slug = serializers.CharField(
+        required=False,
+        allow_blank=True,
+    )
+
     class Meta:
         model = Brand
 
@@ -24,7 +29,6 @@ class BrandSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
-    # Validate and normalize the brand name
     def validate_name(self, value):
         value = value.strip()
 
@@ -33,19 +37,56 @@ class BrandSerializer(serializers.ModelSerializer):
                 "Brand name must contain at least 2 characters."
             )
 
+        queryset = Brand.objects.filter(
+            name__iexact=value
+        )
+
+        if self.instance:
+            queryset = queryset.exclude(
+                pk=self.instance.pk
+            )
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A brand with this name already exists."
+            )
+
         return value
 
-    # Normalize the brand slug
     def validate_slug(self, value):
         value = value.strip().lower()
+
+        if not value:
+            return value
 
         if len(value) < 2:
             raise serializers.ValidationError(
                 "Brand slug must contain at least 2 characters."
             )
 
+        if not all(
+            character.isalnum() or character in "-_"
+            for character in value
+        ):
+            raise serializers.ValidationError(
+                "Brand slug may contain only letters, numbers, hyphens, and underscores."
+            )
+
+        queryset = Brand.objects.filter(
+            slug__iexact=value
+        )
+
+        if self.instance:
+            queryset = queryset.exclude(
+                pk=self.instance.pk
+            )
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A brand with this slug already exists."
+            )
+
         return value
 
-    # Normalize the brand description
     def validate_description(self, value):
         return value.strip()

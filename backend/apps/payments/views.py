@@ -24,14 +24,11 @@ class PaymentCreateView(generics.CreateAPIView):
             "COD",
         )
 
-        # -------------------------------------------------
-        # Validate order ID
-        # -------------------------------------------------
-
+        # Validate order ID.
         if not order_id:
             raise ValidationError(
                 {
-                    "order": "Order ID is required."
+                    "order": "Order ID is required.",
                 }
             )
 
@@ -42,7 +39,7 @@ class PaymentCreateView(generics.CreateAPIView):
                 {
                     "order": (
                         "Order ID must be a valid integer."
-                    )
+                    ),
                 }
             )
 
@@ -51,42 +48,39 @@ class PaymentCreateView(generics.CreateAPIView):
                 {
                     "order": (
                         "Order ID must be a valid integer."
-                    )
+                    ),
                 }
             )
 
-        # -------------------------------------------------
-        # Get authenticated user's order
-        # -------------------------------------------------
-
+        # Get the authenticated user's order.
         order = get_object_or_404(
             Order.objects.select_for_update(),
             id=order_id,
             user=request.user,
         )
 
-        # -------------------------------------------------
-        # Cancelled order protection
-        # -------------------------------------------------
-
+        # Reject cancelled orders.
         if order.status == "CANCELLED":
             raise ValidationError(
-                "Payment cannot be created for a cancelled order."
+                {
+                    "order": (
+                        "Payment cannot be created "
+                        "for a cancelled order."
+                    ),
+                }
             )
 
-        # -------------------------------------------------
-        # Already paid order protection
-        # -------------------------------------------------
-
+        # Reject already paid orders.
         if order.payment_status == "PAID":
             raise ValidationError(
-                "This order has already been paid."
+                {
+                    "order": (
+                        "This order has already been paid."
+                    ),
+                }
             )
 
-        # -------------------------------------------------
-        # Validate payment method
-        # -------------------------------------------------
-
+        # Validate payment method.
         allowed_methods = {
             choice[0]
             for choice in Payment.METHOD_CHOICES
@@ -97,14 +91,11 @@ class PaymentCreateView(generics.CreateAPIView):
                 {
                     "payment_method": (
                         "Invalid payment method."
-                    )
+                    ),
                 }
             )
 
-        # -------------------------------------------------
-        # Create or retrieve payment
-        # -------------------------------------------------
-
+        # Create or retrieve the order payment.
         payment, created = Payment.objects.get_or_create(
             order=order,
             defaults={
@@ -114,23 +105,28 @@ class PaymentCreateView(generics.CreateAPIView):
             },
         )
 
-        # -------------------------------------------------
-        # Existing payment handling
-        # -------------------------------------------------
-
+        # Handle an existing payment.
         if not created:
-
             if payment.status == "SUCCESS":
                 raise ValidationError(
-                    "This order has already been paid."
+                    {
+                        "order": (
+                            "This order has already been paid."
+                        ),
+                    }
                 )
 
             if payment.status == "REFUNDED":
                 raise ValidationError(
-                    "A refunded payment cannot be reused."
+                    {
+                        "order": (
+                            "A refunded payment cannot "
+                            "be reused."
+                        ),
+                    }
                 )
 
-            # Keep amount controlled by backend.
+            # Keep payment amount controlled by backend.
             if payment.amount != order.total_amount:
                 payment.amount = order.total_amount
 
@@ -138,30 +134,20 @@ class PaymentCreateView(generics.CreateAPIView):
                     update_fields=[
                         "amount",
                         "updated_at",
-                    ]
+                    ],
                 )
 
-            # Allow changing payment method only
-            # while payment is still pending.
+            # Allow method changes only for pending payments.
             if payment.status == "PENDING":
-                if (
-                    payment.payment_method
-                    != payment_method
-                ):
-                    payment.payment_method = (
-                        payment_method
-                    )
+                if payment.payment_method != payment_method:
+                    payment.payment_method = payment_method
 
                     payment.save(
                         update_fields=[
                             "payment_method",
                             "updated_at",
-                        ]
+                        ],
                     )
-
-        # -------------------------------------------------
-        # Serialize response
-        # -------------------------------------------------
 
         serializer = self.get_serializer(
             payment,

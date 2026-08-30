@@ -8,7 +8,6 @@ from .models import Address
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-
         fields = (
             "id",
             "address_type",
@@ -23,7 +22,6 @@ class AddressSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-
         read_only_fields = (
             "id",
             "created_at",

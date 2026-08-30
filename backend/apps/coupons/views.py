@@ -1,15 +1,54 @@
 from decimal import Decimal, InvalidOperation
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
-from rest_framework import generics, status
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny, BasePermission
-from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiResponse,
+    extend_schema,
+)
+from rest_framework import generics, serializers, status
+from rest_framework.exceptions import (
+    PermissionDenied,
+    ValidationError,
+)
+from rest_framework.permissions import (
+    AllowAny,
+    BasePermission,
+    IsAuthenticated,
+)
 from rest_framework.response import Response
 
 from .models import Coupon
 from .serializers import CouponSerializer
+
+
+class CouponUseRequestSerializer(serializers.Serializer):
+    coupon = serializers.IntegerField(
+        required=True,
+    )
+
+    order_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=True,
+        min_value=Decimal("0.00"),
+    )
+
+
+class CouponUseResponseSerializer(serializers.Serializer):
+    coupon = serializers.IntegerField()
+    code = serializers.CharField()
+    discount_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    final_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    used_count = serializers.IntegerField()
 
 
 class IsAdminUser(BasePermission):
@@ -20,9 +59,7 @@ class IsAdminUser(BasePermission):
         )
 
 
-class CouponListCreateView(
-    generics.ListCreateAPIView
-):
+class CouponListCreateView(generics.ListCreateAPIView):
     serializer_class = CouponSerializer
 
     search_fields = [
@@ -56,35 +93,29 @@ class CouponListCreateView(
         return Coupon.objects.all()
 
 
-class CouponDetailView(
-    generics.RetrieveUpdateDestroyAPIView
-):
+class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CouponSerializer
     permission_classes = [
-        IsAdminUser
+        IsAdminUser,
     ]
 
     queryset = Coupon.objects.all()
 
 
-class CouponValidateView(
-    generics.GenericAPIView
-):
+class CouponValidateView(generics.GenericAPIView):
     serializer_class = CouponSerializer
     permission_classes = [
-        AllowAny
+        AllowAny,
     ]
 
     def post(self, request, *args, **kwargs):
         code = request.data.get("code")
-        order_amount = request.data.get(
-            "order_amount"
-        )
+        order_amount = request.data.get("order_amount")
 
         if not code:
             raise ValidationError(
                 {
-                    "code": "Coupon code is required."
+                    "code": "Coupon code is required.",
                 }
             )
 
@@ -93,7 +124,7 @@ class CouponValidateView(
                 {
                     "order_amount": (
                         "Order amount is required."
-                    )
+                    ),
                 }
             )
 
@@ -101,13 +132,17 @@ class CouponValidateView(
             order_amount = Decimal(
                 str(order_amount)
             )
-        except (TypeError, ValueError, InvalidOperation):
+        except (
+            TypeError,
+            ValueError,
+            InvalidOperation,
+        ):
             raise ValidationError(
                 {
                     "order_amount": (
                         "Order amount must be "
                         "a valid number."
-                    )
+                    ),
                 }
             )
 
@@ -117,7 +152,7 @@ class CouponValidateView(
                     "order_amount": (
                         "Order amount cannot "
                         "be negative."
-                    )
+                    ),
                 }
             )
 
@@ -126,25 +161,13 @@ class CouponValidateView(
             code=code.strip().upper(),
         )
 
-        if not coupon.is_active:
+        if not coupon.is_valid:
             raise ValidationError(
-                "This coupon is currently inactive."
-            )
-
-        if not coupon.is_started:
-            raise ValidationError(
-                "This coupon is not active yet."
-            )
-
-        if coupon.is_expired:
-            raise ValidationError(
-                "This coupon has expired."
-            )
-
-        if coupon.is_usage_limit_reached:
-            raise ValidationError(
-                "This coupon usage limit has "
-                "been reached."
+                {
+                    "coupon": (
+                        "This coupon is no longer valid."
+                    ),
+                }
             )
 
         discount = coupon.calculate_discount(
@@ -158,7 +181,7 @@ class CouponValidateView(
                         "Minimum order amount for "
                         "this coupon has not "
                         "been reached."
-                    )
+                    ),
                 }
             )
 
@@ -188,13 +211,37 @@ class CouponValidateView(
         )
 
 
-class CouponUseView(
-    generics.GenericAPIView
-):
+class CouponUseView(generics.GenericAPIView):
+    serializer_class = CouponUseRequestSerializer
     permission_classes = [
-        IsAuthenticated
+        IsAuthenticated,
     ]
 
+    @extend_schema(
+        request=CouponUseRequestSerializer,
+        responses={
+            200: CouponUseResponseSerializer,
+            400: OpenApiResponse(
+                description="Invalid coupon or order amount.",
+            ),
+            403: OpenApiResponse(
+                description=(
+                    "Only admins and vendors can "
+                    "redeem coupons."
+                ),
+            ),
+        },
+        examples=[
+            OpenApiExample(
+                "Coupon Use Request",
+                request_only=True,
+                value={
+                    "coupon": 1,
+                    "order_amount": "2500.00",
+                },
+            ),
+        ],
+    )
     @transaction.atomic
     def post(self, request, *args, **kwargs):
         if request.user.role not in (
@@ -206,20 +253,15 @@ class CouponUseView(
                 "to redeem coupons."
             )
 
-        coupon_id = request.data.get(
-            "coupon"
-        )
-
-        order_amount = request.data.get(
-            "order_amount"
-        )
+        coupon_id = request.data.get("coupon")
+        order_amount = request.data.get("order_amount")
 
         if not coupon_id:
             raise ValidationError(
                 {
                     "coupon": (
                         "Coupon ID is required."
-                    )
+                    ),
                 }
             )
 
@@ -228,7 +270,7 @@ class CouponUseView(
                 {
                     "order_amount": (
                         "Order amount is required."
-                    )
+                    ),
                 }
             )
 
@@ -236,13 +278,17 @@ class CouponUseView(
             order_amount = Decimal(
                 str(order_amount)
             )
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError,
+            InvalidOperation,
+        ):
             raise ValidationError(
                 {
                     "order_amount": (
                         "Order amount must be "
                         "a valid number."
-                    )
+                    ),
                 }
             )
 
@@ -252,7 +298,7 @@ class CouponUseView(
                     "order_amount": (
                         "Order amount cannot "
                         "be negative."
-                    )
+                    ),
                 }
             )
 
@@ -268,15 +314,17 @@ class CouponUseView(
         if coupon is None:
             raise ValidationError(
                 {
-                    "coupon": (
-                        "Coupon not found."
-                    )
+                    "coupon": "Coupon not found.",
                 }
             )
 
         if not coupon.is_valid:
             raise ValidationError(
-                "This coupon is no longer valid."
+                {
+                    "coupon": (
+                        "This coupon is no longer valid."
+                    ),
+                }
             )
 
         discount = coupon.calculate_discount(
@@ -285,8 +333,25 @@ class CouponUseView(
 
         if discount <= Decimal("0.00"):
             raise ValidationError(
-                "Coupon cannot be applied "
-                "to this order."
+                {
+                    "order_amount": (
+                        "Coupon cannot be applied "
+                        "to this order."
+                    ),
+                }
+            )
+
+        if (
+            coupon.usage_limit is not None
+            and coupon.used_count >= coupon.usage_limit
+        ):
+            raise ValidationError(
+                {
+                    "coupon": (
+                        "This coupon usage limit "
+                        "has been reached."
+                    ),
+                }
             )
 
         coupon.used_count += 1
@@ -312,9 +377,7 @@ class CouponUseView(
                 "final_amount": (
                     f"{final_amount:.2f}"
                 ),
-                "used_count": (
-                    coupon.used_count
-                ),
+                "used_count": coupon.used_count,
             },
             status=status.HTTP_200_OK,
         )

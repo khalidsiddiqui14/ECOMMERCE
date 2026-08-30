@@ -20,8 +20,15 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(
+            self,
+            "swagger_fake_view",
+            False,
+        ):
+            return Notification.objects.none()
+
         return Notification.objects.filter(
-            user=self.request.user
+            user=self.request.user,
         )
 
 
@@ -32,8 +39,15 @@ class NotificationDetailView(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(
+            self,
+            "swagger_fake_view",
+            False,
+        ):
+            return Notification.objects.none()
+
         return Notification.objects.filter(
-            user=self.request.user
+            user=self.request.user,
         )
 
 
@@ -49,8 +63,15 @@ class NotificationMarkReadView(
     ]
 
     def get_queryset(self):
+        if getattr(
+            self,
+            "swagger_fake_view",
+            False,
+        ):
+            return Notification.objects.none()
+
         return Notification.objects.filter(
-            user=self.request.user
+            user=self.request.user,
         )
 
     def patch(self, request, *args, **kwargs):
@@ -60,21 +81,24 @@ class NotificationMarkReadView(
         )
 
         notification.is_read = True
+
         notification.save(
             update_fields=[
                 "is_read",
                 "updated_at",
-            ]
+            ],
         )
 
         serializer = self.get_serializer(
-            notification
+            notification,
         )
 
         return Response(
             serializer.data,
             status=status.HTTP_200_OK,
         )
+
+
 class NotificationPreferenceView(
     generics.RetrieveUpdateAPIView
 ):

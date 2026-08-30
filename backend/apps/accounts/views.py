@@ -1,3 +1,5 @@
+from drf_spectacular.utils import extend_schema
+
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,17 +21,31 @@ class RegisterView(generics.CreateAPIView):
 
 
 class LoginView(APIView):
+    serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=LoginSerializer,
+        responses=LoginSerializer,
+    )
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer = LoginSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
 
         user = serializer.validated_data["user"]
 
         if not user.is_active:
             return Response(
-                {"detail": "This account is inactive."},
+                {
+                    "detail": (
+                        "This account is inactive."
+                    )
+                },
                 status=400,
             )
 
@@ -38,19 +54,36 @@ class LoginView(APIView):
         return Response(
             {
                 "refresh": str(refresh),
-                "access": str(refresh.access_token),
+                "access": str(
+                    refresh.access_token,
+                ),
                 "user": UserSerializer(user).data,
             }
         )
 
 
 class ProfileView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
 
+    @extend_schema(
+        responses=UserSerializer,
+    )
     def get(self, request):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
+        serializer = UserSerializer(
+            request.user,
+        )
 
+        return Response(
+            serializer.data,
+        )
+
+    @extend_schema(
+        request=UserSerializer,
+        responses=UserSerializer,
+    )
     def put(self, request):
         serializer = UserSerializer(
             request.user,
@@ -58,37 +91,70 @@ class ProfileView(APIView):
             partial=True,
         )
 
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
         serializer.save()
 
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+        )
 
 
 class ChangePasswordView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
 
+    @extend_schema(
+        request=ChangePasswordSerializer,
+        responses={
+            200: None,
+        },
+    )
     def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
 
         user = request.user
 
         if not user.check_password(
-            serializer.validated_data["current_password"]
+            serializer.validated_data[
+                "current_password"
+            ]
         ):
             return Response(
-                {"detail": "Current password is incorrect."},
+                {
+                    "detail": (
+                        "Current password is incorrect."
+                    )
+                },
                 status=400,
             )
 
         user.set_password(
-            serializer.validated_data["new_password"]
+            serializer.validated_data[
+                "new_password"
+            ]
         )
 
         user.save(
-            update_fields=["password"]
+            update_fields=[
+                "password",
+            ]
         )
 
         return Response(
-            {"detail": "Password changed successfully."}
+            {
+                "detail": (
+                    "Password changed successfully."
+                )
+            }
         )

@@ -311,7 +311,7 @@ class ProductAPITestCase(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    # Test vendor can create a product in own store
+    # Test vendor can create a product
     def test_vendor_can_create_product(self):
         self.client.force_authenticate(
             user=self.vendor_user,
@@ -429,6 +429,89 @@ class ProductAPITestCase(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_404_NOT_FOUND,
+        )
+
+    # Test vendor cannot change product store
+    def test_vendor_cannot_change_product_store(self):
+        self.client.force_authenticate(
+            user=self.vendor_user,
+        )
+
+        response = self.client.patch(
+            f"/api/products/{self.product.id}/",
+            {
+                "store": self.other_store.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.product.refresh_from_db()
+
+        self.assertEqual(
+            self.product.store_id,
+            self.store.id,
+        )
+
+    # Test vendor can delete own product
+    def test_vendor_can_delete_own_product(self):
+        self.client.force_authenticate(
+            user=self.vendor_user,
+        )
+
+        product_id = self.product.id
+
+        response = self.client.delete(
+            f"/api/products/{product_id}/",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.assertFalse(
+            Product.objects.filter(
+                id=product_id,
+            ).exists()
+        )
+
+    # Test vendor cannot delete another vendor product
+    def test_vendor_cannot_delete_other_vendor_product(self):
+        self.client.force_authenticate(
+            user=self.vendor_user,
+        )
+
+        product_id = self.other_product.id
+
+        response = self.client.delete(
+            f"/api/products/{product_id}/",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+        self.assertTrue(
+            Product.objects.filter(
+                id=product_id,
+            ).exists()
+        )
+
+    # Test unauthenticated users cannot delete products
+    def test_unauthenticated_user_cannot_delete_product(self):
+        response = self.client.delete(
+            f"/api/products/{self.product.id}/",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     # Test admin can delete a product
@@ -563,7 +646,8 @@ class ProductAPITestCase(APITestCase):
             response.data["count"],
             1,
         )
-        # Test product list pagination
+
+    # Test product list pagination
     def test_product_list_is_paginated(self):
         for index in range(11):
             Product.objects.create(
@@ -581,7 +665,7 @@ class ProductAPITestCase(APITestCase):
             )
 
         response = self.client.get(
-            "/api/products/"
+            "/api/products/",
         )
 
         self.assertEqual(
@@ -600,7 +684,7 @@ class ProductAPITestCase(APITestCase):
         )
 
         response = self.client.get(
-            "/api/products/?page=2"
+            "/api/products/?page=2",
         )
 
         self.assertEqual(
@@ -612,10 +696,11 @@ class ProductAPITestCase(APITestCase):
             len(response.data["results"]),
             3,
         )
-        # Test product search
+
+    # Test product search
     def test_product_search(self):
         response = self.client.get(
-            "/api/products/?search=Smart Watch"
+            "/api/products/?search=Smart Watch",
         )
 
         self.assertEqual(
@@ -632,15 +717,15 @@ class ProductAPITestCase(APITestCase):
             response.data["results"][0]["name"],
             "Smart Watch",
         )
-        # Test product filtering
-        # Test product filtering by status
+
+    # Test product filtering by status
     def test_product_filter_by_status(self):
         self.client.force_authenticate(
             user=self.admin,
         )
 
         response = self.client.get(
-            "/api/products/?status=DRAFT"
+            "/api/products/?status=DRAFT",
         )
 
         self.assertEqual(
@@ -657,10 +742,11 @@ class ProductAPITestCase(APITestCase):
             response.data["results"][0]["name"],
             "Draft Product",
         )
-        # Test product ordering by price
+
+    # Test product ordering by price
     def test_product_ordering_by_price(self):
         response = self.client.get(
-            "/api/products/?ordering=price"
+            "/api/products/?ordering=price",
         )
 
         self.assertEqual(

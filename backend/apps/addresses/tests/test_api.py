@@ -5,11 +5,11 @@ from rest_framework.test import APITestCase
 
 from apps.addresses.models import Address
 
+
 User = get_user_model()
 
 
 class AddressAPITestCase(APITestCase):
-
     def setUp(self):
         self.user = User.objects.create_user(
             username="addressuser",
@@ -61,6 +61,9 @@ class AddressAPITestCase(APITestCase):
             "postal_code": "110001",
             "is_default": is_default,
         }
+
+    def get_detail_url(self, address_id):
+        return f"{self.list_url}{address_id}/"
 
     # Authentication tests.
 
@@ -164,15 +167,15 @@ class AddressAPITestCase(APITestCase):
 
         self.authenticate()
 
+        data = self.address_data(
+            is_default=True,
+        )
+        data["address_type"] = "WORK"
+        data["address_line"] = "456 Work Street"
+
         response = self.client.post(
             self.list_url,
-            {
-                **self.address_data(
-                    is_default=True,
-                ),
-                "address_type": "WORK",
-                "address_line": "456 Work Street",
-            },
+            data,
             format="json",
         )
 
@@ -203,83 +206,87 @@ class AddressAPITestCase(APITestCase):
 
     # List tests.
 
-def test_user_can_list_own_addresses(self):
-    first = self.create_address(
-        is_default=True,
-    )
+    def test_user_can_list_own_addresses(self):
+        first = self.create_address(
+            is_default=True,
+        )
 
-    second = self.create_address(
-        address_type="WORK",
-    )
+        second = self.create_address(
+            address_type="WORK",
+        )
 
-    self.authenticate()
+        self.authenticate()
 
-    response = self.client.get(
-        self.list_url,
-    )
+        response = self.client.get(
+            self.list_url,
+        )
 
-    self.assertEqual(
-        response.status_code,
-        status.HTTP_200_OK,
-    )
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
 
-    results = response.data["results"]
+        results = response.data["results"]
 
-    self.assertEqual(
-        len(results),
-        2,
-    )
+        self.assertEqual(
+            len(results),
+            2,
+        )
 
-    returned_ids = {
-        item["id"]
-        for item in results
-    }
+        returned_ids = {
+            item["id"]
+            for item in results
+        }
 
-    self.assertIn(
-        first.id,
-        returned_ids,
-    )
+        self.assertIn(
+            first.id,
+            returned_ids,
+        )
 
-    self.assertIn(
-        second.id,
-        returned_ids,
-    )
+        self.assertIn(
+            second.id,
+            returned_ids,
+        )
 
+        self.assertEqual(
+            results[0]["id"],
+            first.id,
+        )
 
-def test_user_cannot_see_other_users_addresses(self):
-    own_address = self.create_address()
+    def test_user_cannot_see_other_users_addresses(self):
+        own_address = self.create_address()
 
-    other_address = self.create_address(
-        user=self.other_user,
-    )
+        other_address = self.create_address(
+            user=self.other_user,
+        )
 
-    self.authenticate()
+        self.authenticate()
 
-    response = self.client.get(
-        self.list_url,
-    )
+        response = self.client.get(
+            self.list_url,
+        )
 
-    self.assertEqual(
-        response.status_code,
-        status.HTTP_200_OK,
-    )
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
 
-    results = response.data["results"]
+        results = response.data["results"]
 
-    returned_ids = {
-        item["id"]
-        for item in results
-    }
+        returned_ids = {
+            item["id"]
+            for item in results
+        }
 
-    self.assertIn(
-        own_address.id,
-        returned_ids,
-    )
+        self.assertIn(
+            own_address.id,
+            returned_ids,
+        )
 
-    self.assertNotIn(
-        other_address.id,
-        returned_ids,
-    )
+        self.assertNotIn(
+            other_address.id,
+            returned_ids,
+        )
 
     # Detail tests.
 
@@ -289,7 +296,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.get(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
         )
 
         self.assertEqual(
@@ -310,7 +317,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.get(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
         )
 
         self.assertEqual(
@@ -326,7 +333,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.patch(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
             {
                 "city": "Mumbai",
                 "postal_code": "400001",
@@ -364,7 +371,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.patch(
-            f"{self.list_url}{second.id}/",
+            self.get_detail_url(second.id),
             {
                 "is_default": True,
             },
@@ -395,7 +402,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.patch(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
             {
                 "city": "Mumbai",
             },
@@ -422,7 +429,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.delete(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
         )
 
         self.assertEqual(
@@ -433,7 +440,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.assertFalse(
             Address.objects.filter(
                 id=address.id,
-            ).exists()
+            ).exists(),
         )
 
     def test_user_cannot_delete_other_users_address(self):
@@ -444,7 +451,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.delete(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
         )
 
         self.assertEqual(
@@ -455,7 +462,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.assertTrue(
             Address.objects.filter(
                 id=address.id,
-            ).exists()
+            ).exists(),
         )
 
     def test_deleting_default_address_promotes_next_address(self):
@@ -471,7 +478,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.delete(
-            f"{self.list_url}{default_address.id}/",
+            self.get_detail_url(default_address.id),
         )
 
         self.assertEqual(
@@ -493,7 +500,7 @@ def test_user_cannot_see_other_users_addresses(self):
         self.authenticate()
 
         response = self.client.delete(
-            f"{self.list_url}{address.id}/",
+            self.get_detail_url(address.id),
         )
 
         self.assertEqual(
@@ -543,6 +550,23 @@ def test_user_cannot_see_other_users_addresses(self):
         self.assertEqual(
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_phone_validation_accepts_international_phone(self):
+        self.authenticate()
+
+        data = self.address_data()
+        data["phone"] = "+919876543210"
+
+        response = self.client.post(
+            self.list_url,
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
         )
 
     def test_postal_code_is_required(self):
@@ -666,4 +690,32 @@ def test_user_cannot_see_other_users_addresses(self):
         self.assertNotIn(
             "user",
             response.data,
+        )
+
+    def test_user_cannot_assign_address_to_another_user(self):
+        self.authenticate()
+
+        data = self.address_data()
+
+        response = self.client.post(
+            self.list_url,
+            {
+                **data,
+                "user": self.other_user.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        address = Address.objects.get(
+            id=response.data["id"],
+        )
+
+        self.assertEqual(
+            address.user,
+            self.user,
         )

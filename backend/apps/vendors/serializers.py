@@ -4,11 +4,14 @@ from .models import Vendor
 
 
 class VendorSerializer(serializers.ModelSerializer):
-    # Keep the vendor user relationship read-only
-    user = serializers.StringRelatedField(read_only=True)
+    # Keep the vendor user relationship read-only.
+    user = serializers.StringRelatedField(
+        read_only=True,
+    )
 
     class Meta:
         model = Vendor
+
         fields = (
             "id",
             "user",
@@ -30,11 +33,12 @@ class VendorSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "is_verified",
+            "is_active",
             "created_at",
             "updated_at",
         )
 
-    # Validate and normalize the business name
+    # Validate and normalize the business name.
     def validate_business_name(self, value):
         value = value.strip()
 
@@ -45,14 +49,18 @@ class VendorSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate and normalize the vendor phone number
+    # Validate and normalize the vendor phone number.
     def validate_phone(self, value):
         value = value.strip()
 
-        queryset = Vendor.objects.filter(phone=value)
+        queryset = Vendor.objects.filter(
+            phone=value,
+        )
 
         if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
+            queryset = queryset.exclude(
+                pk=self.instance.pk,
+            )
 
         if queryset.exists():
             raise serializers.ValidationError(
@@ -61,17 +69,21 @@ class VendorSerializer(serializers.ModelSerializer):
 
         return value
 
-    # Validate and normalize the GST number
+    # Validate and normalize the GST number.
     def validate_gst_number(self, value):
         if not value:
             return value
 
         value = value.strip().upper()
 
-        queryset = Vendor.objects.filter(gst_number=value)
+        queryset = Vendor.objects.filter(
+            gst_number=value,
+        )
 
         if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
+            queryset = queryset.exclude(
+                pk=self.instance.pk,
+            )
 
         if queryset.exists():
             raise serializers.ValidationError(
