@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
 
 import { createOrder } from "../services/orderService";
 import { createPayment } from "../services/paymentService";
@@ -25,6 +28,7 @@ function Checkout() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Handle form changes
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -38,6 +42,7 @@ function Checkout() {
     }
   };
 
+  // Format API errors
   const formatError = (error) => {
     const data = error.response?.data;
 
@@ -60,7 +65,9 @@ function Checkout() {
         data.missing_fields
       )
         .map(([field, message]) => {
-          const value = Array.isArray(message)
+          const value = Array.isArray(
+            message
+          )
             ? message.join(", ")
             : message;
 
@@ -81,7 +88,9 @@ function Checkout() {
     if (entries.length > 0) {
       return entries
         .map(([field, message]) => {
-          const value = Array.isArray(message)
+          const value = Array.isArray(
+            message
+          )
             ? message.join(", ")
             : typeof message === "object"
               ? JSON.stringify(message)
@@ -95,6 +104,7 @@ function Checkout() {
     return "Checkout failed. Please try again.";
   };
 
+  // Validate checkout form
   const validateForm = () => {
     const requiredFields = [
       ["shipping_name", "Full name"],
@@ -114,6 +124,7 @@ function Checkout() {
         setError(
           `${label} is required.`
         );
+
         return false;
       }
     }
@@ -125,6 +136,7 @@ function Checkout() {
       setError(
         "Please enter a valid phone number."
       );
+
       return false;
     }
 
@@ -135,12 +147,14 @@ function Checkout() {
       setError(
         "Please enter a valid postal code."
       );
+
       return false;
     }
 
     return true;
   };
 
+  // Place order and create payment
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -208,13 +222,10 @@ function Checkout() {
         `Order #${order.id} placed successfully.`
       );
 
-      // 3. Give the user a moment
-      // to see the success message.
-      setTimeout(() => {
-        navigate("/orders", {
-          replace: true,
-        });
-      }, 1200);
+      // Redirect after successful checkout
+      navigate("/orders", {
+        replace: true,
+      });
     } catch (error) {
       console.error(
         "CHECKOUT ERROR:",
@@ -245,6 +256,7 @@ function Checkout() {
           <div
             className="auth-error"
             role="alert"
+            aria-live="assertive"
           >
             {error}
           </div>
@@ -473,8 +485,17 @@ function Checkout() {
               <div className="checkout-actions">
                 <Link
                   to="/cart"
-                  className="btn btn-secondary"
+                  className={`btn btn-secondary${
+                    loading
+                      ? " checkout-link-disabled"
+                      : ""
+                  }`}
                   aria-disabled={loading}
+                  onClick={(event) => {
+                    if (loading) {
+                      event.preventDefault();
+                    }
+                  }}
                 >
                   Back to Cart
                 </Link>

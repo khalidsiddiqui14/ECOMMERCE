@@ -4,16 +4,19 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="footer-container">
-        <div className="footer-section">
+        <section className="footer-section footer-brand">
           <h2>E-Shop</h2>
 
           <p>
             Your trusted online store for quality
             products at great prices.
           </p>
-        </div>
+        </section>
 
-        <div className="footer-section">
+        <nav
+          className="footer-section"
+          aria-label="Quick links"
+        >
           <h3>Quick Links</h3>
 
           <Link to="/">
@@ -31,9 +34,12 @@ function Footer() {
           <Link to="/cart">
             Cart
           </Link>
-        </div>
+        </nav>
 
-        <div className="footer-section">
+        <nav
+          className="footer-section"
+          aria-label="Customer links"
+        >
           <h3>Customer</h3>
 
           <Link to="/orders">
@@ -55,23 +61,27 @@ function Footer() {
           <Link to="/register">
             Register
           </Link>
-        </div>
+        </nav>
 
-        <div className="footer-section">
+        <section className="footer-section footer-contact">
           <h3>Contact</h3>
 
           <p>
-            Email: support@eshop.com
+            Email:{" "}
+            <a href="mailto:support@eshop.com">
+              support@eshop.com
+            </a>
           </p>
 
           <p>
-            Phone: +91 98765 43210
+            Phone:{" "}
+            <a href="tel:+919876543210">
+              +91 98765 43210
+            </a>
           </p>
 
-          <p>
-            India
-          </p>
-        </div>
+          <p>India</p>
+        </section>
       </div>
 
       <div className="footer-bottom">

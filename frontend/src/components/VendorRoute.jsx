@@ -4,22 +4,23 @@ import {
   useLocation,
 } from "react-router-dom";
 
-
 function VendorRoute() {
   const location = useLocation();
 
-  const token =
-    localStorage.getItem("access_token");
+  const accessToken = localStorage.getItem(
+    "access_token"
+  );
 
-  const storedUser =
-    localStorage.getItem("user");
+  const storedUser = localStorage.getItem(
+    "user"
+  );
 
   let user = null;
 
   try {
-    user = storedUser
-      ? JSON.parse(storedUser)
-      : null;
+    if (storedUser) {
+      user = JSON.parse(storedUser);
+    }
   } catch (error) {
     console.error(
       "INVALID STORED USER:",
@@ -29,8 +30,7 @@ function VendorRoute() {
     localStorage.removeItem("user");
   }
 
-
-  if (!token) {
+  if (!accessToken || !user) {
     return (
       <Navigate
         to="/login"
@@ -42,21 +42,7 @@ function VendorRoute() {
     );
   }
 
-
-  if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={{
-          from: location,
-        }}
-      />
-    );
-  }
-
-
-  if (user?.role !== "VENDOR") {
+  if (user.role !== "VENDOR") {
     return (
       <Navigate
         to="/"
@@ -65,9 +51,7 @@ function VendorRoute() {
     );
   }
 
-
   return <Outlet />;
 }
-
 
 export default VendorRoute;

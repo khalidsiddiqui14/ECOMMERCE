@@ -8,14 +8,12 @@ import {
 import { loginUser } from "../services/authService";
 import { getProfile } from "../services/userService";
 
-
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] =
-    useState("");
+  const [password, setPassword] = useState("");
 
   const [showPassword, setShowPassword] =
     useState(false);
@@ -26,32 +24,24 @@ function Login() {
   const [error, setError] =
     useState("");
 
-
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError("");
     setLoading(true);
 
-
     try {
-      // 1. Login
       const data = await loginUser(
         email,
         password
       );
 
-
-      // Make sure the login response
-      // contains the access token.
       if (!data?.access) {
         throw new Error(
           "Login succeeded but no access token was returned."
         );
       }
 
-
-      // 2. Save JWT tokens
       localStorage.setItem(
         "access_token",
         data.access
@@ -64,27 +54,15 @@ function Login() {
         );
       }
 
-
-      // 3. Get logged-in user's profile
       let user;
 
       try {
         user = await getProfile();
-
       } catch (profileError) {
         console.error(
           "PROFILE LOAD ERROR:",
           profileError
         );
-
-        /*
-         * Login itself was successful.
-         *
-         * Do NOT delete the access token here.
-         * The session should remain available so
-         * the actual authentication problem can
-         * be diagnosed separately.
-         */
 
         setError(
           profileError.response?.data?.detail ||
@@ -95,8 +73,6 @@ function Login() {
         return;
       }
 
-
-      // 4. Make sure profile data exists
       if (!user) {
         setError(
           "Login successful, but user profile was not returned."
@@ -105,26 +81,19 @@ function Login() {
         return;
       }
 
-
-      console.log(
-        "LOGGED IN USER:",
-        user
-      );
-
-
-      // 5. Save user information
       localStorage.setItem(
         "user",
         JSON.stringify(user)
       );
 
+      window.dispatchEvent(
+        new Event("auth-change")
+      );
 
-      // 6. Redirect
       const from =
         location.state?.from?.pathname;
 
-
-      if (user?.role === "VENDOR") {
+      if (user.role === "VENDOR") {
         navigate(
           from || "/vendor/dashboard",
           {
@@ -139,22 +108,11 @@ function Login() {
           }
         );
       }
-
     } catch (error) {
       console.error(
         "LOGIN ERROR:",
         error
       );
-
-
-      /*
-       * This catch is for an actual login
-       * failure.
-       *
-       * Clear incomplete authentication
-       * data only when the login request
-       * itself fails.
-       */
 
       localStorage.removeItem(
         "access_token"
@@ -164,87 +122,73 @@ function Login() {
         "refresh_token"
       );
 
-
       if (error.response?.data) {
-        const responseData =
+        const data =
           error.response.data;
 
-
-        if (responseData.detail) {
+        if (data.detail) {
+          setError(data.detail);
+        } else if (data.email) {
           setError(
-            responseData.detail
+            Array.isArray(data.email)
+              ? data.email[0]
+              : data.email
           );
-
-        } else if (
-          responseData.email
-        ) {
+        } else if (data.password) {
           setError(
-            responseData.email[0]
+            Array.isArray(data.password)
+              ? data.password[0]
+              : data.password
           );
-
-        } else if (
-          responseData.password
-        ) {
-          setError(
-            responseData.password[0]
-          );
-
         } else {
           setError(
             "Unable to login. Please check your email and password."
           );
         }
-
       } else {
         setError(
           error.message ||
             "Unable to connect to the server."
         );
       }
-
     } finally {
       setLoading(false);
     }
   };
 
-
   return (
     <main className="auth-page">
-
       <div className="auth-card">
 
         <div className="auth-header">
-
-          <h1>
-            Welcome Back
-          </h1>
+          <h1>Welcome Back</h1>
 
           <p>
             Login to your E-Shop account
           </p>
-
         </div>
 
-
         {error && (
-          <div className="auth-error">
+          <div
+            className="auth-error"
+            role="alert"
+            aria-live="assertive"
+          >
             {error}
           </div>
         )}
 
-
         <form
           onSubmit={handleSubmit}
+          className="auth-form"
         >
-
           <div className="form-group">
-
-            <label htmlFor="email">
+            <label htmlFor="login-email">
               Email
             </label>
 
             <input
-              id="email"
+              id="login-email"
               type="email"
               placeholder="Enter your email"
               value={email}
@@ -257,23 +201,16 @@ function Login() {
               required
               disabled={loading}
             />
-
           </div>
 
-
           <div className="form-group">
-
-            <label htmlFor="password">
+            <label htmlFor="login-password">
               Password
             </label>
 
-            <div
-              style={{
-                position: "relative",
-              }}
-            >
+            <div className="password-field">
               <input
-                id="password"
+                id="login-password"
                 type={
                   showPassword
                     ? "text"
@@ -289,14 +226,12 @@ function Login() {
                 autoComplete="current-password"
                 required
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  paddingRight: "48px",
-                }}
+                className="password-input"
               />
 
               <button
                 type="button"
+                className="password-toggle"
                 onClick={() =>
                   setShowPassword(
                     (previous) =>
@@ -314,28 +249,13 @@ function Login() {
                     ? "Hide password"
                     : "Show password"
                 }
-                style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform:
-                    "translateY(-50%)",
-                  border: "none",
-                  background: "transparent",
-                  cursor: loading
-                    ? "not-allowed"
-                    : "pointer",
-                  padding: "4px",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                }}
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword
+                  ? "🙈"
+                  : "👁️"}
               </button>
             </div>
-
           </div>
-
 
           <button
             type="submit"
@@ -346,28 +266,21 @@ function Login() {
               ? "Logging in..."
               : "Login"}
           </button>
-
         </form>
 
-
         <div className="auth-footer">
-
           <p>
             Don't have an account?{" "}
 
             <Link to="/register">
               Create Account
             </Link>
-
           </p>
-
         </div>
 
       </div>
-
     </main>
   );
 }
-
 
 export default Login;

@@ -97,36 +97,26 @@ function Home() {
   const [newsletterMessage, setNewsletterMessage] =
     useState("");
 
-  // Filter products
   const filteredProducts =
     activeCategory === "All Products"
       ? products
       : activeCategory === "Electronics"
         ? products.filter(
             (product) =>
-              product.category ===
-                "Electronics" ||
-              product.category ===
-                "Computers"
+              product.category === "Electronics" ||
+              product.category === "Computers"
           )
         : activeCategory === "Accessories"
           ? products.filter(
               (product) =>
-                product.category ===
-                  "Audio" ||
-                product.category ===
-                  "Wearables"
+                product.category === "Audio" ||
+                product.category === "Wearables"
             )
           : [];
 
-  // Add Product To Wishlist
-  const handleAddToWishlist = async (
-    product
-  ) => {
+  const handleAddToWishlist = async (product) => {
     const token =
-      localStorage.getItem(
-        "access_token"
-      );
+      localStorage.getItem("access_token");
 
     if (!token) {
       setWishlistMessage(
@@ -136,16 +126,11 @@ function Home() {
       return;
     }
 
-    setWishlistLoadingId(
-      product.id
-    );
-
+    setWishlistLoadingId(product.id);
     setWishlistMessage("");
 
     try {
-      await addToWishlist(
-        product.id
-      );
+      await addToWishlist(product.id);
 
       setWishlistMessage(
         `${product.name} added to your wishlist.`
@@ -162,16 +147,11 @@ function Home() {
           "Product wishlist me add nahi ho paaya."
       );
     } finally {
-      setWishlistLoadingId(
-        null
-      );
+      setWishlistLoadingId(null);
     }
   };
 
-  // Newsletter Submit
-  const handleNewsletterSubmit = (
-    event
-  ) => {
+  const handleNewsletterSubmit = (event) => {
     event.preventDefault();
 
     const email =
@@ -190,7 +170,7 @@ function Home() {
 
   return (
     <main className="home">
-      {/* TOP BAR */}
+      {/* Top bar */}
 
       <div className="home-top-bar">
         <div className="home-container home-top-inner">
@@ -209,7 +189,7 @@ function Home() {
         </div>
       </div>
 
-      {/* HERO */}
+      {/* Hero */}
 
       <section className="home-hero">
         <div className="home-container home-hero-grid">
@@ -238,7 +218,7 @@ function Home() {
                 to="/products"
                 className="home-primary-button"
               >
-                Shop Now <span>→</span>
+                Shop Now <span aria-hidden="true">→</span>
               </Link>
 
               <Link
@@ -251,48 +231,38 @@ function Home() {
 
             <div className="home-hero-stats">
               <div>
-                <strong>
-                  1000+
-                </strong>
-
-                <span>
-                  Products
-                </span>
+                <strong>1000+</strong>
+                <span>Products</span>
               </div>
 
               <div>
-                <strong>
-                  50+
-                </strong>
-
-                <span>
-                  Vendors
-                </span>
+                <strong>50+</strong>
+                <span>Vendors</span>
               </div>
 
               <div>
-                <strong>
-                  4.8★
-                </strong>
-
-                <span>
-                  Rating
-                </span>
+                <strong>4.8★</strong>
+                <span>Rating</span>
               </div>
             </div>
           </div>
 
           <div className="home-hero-product">
-            <div className="home-hero-glow" />
+            <div
+              className="home-hero-glow"
+              aria-hidden="true"
+            />
 
-            <div className="home-hero-product-image">
+            <div
+              className="home-hero-product-image"
+              role="img"
+              aria-label="Wireless headphones"
+            >
               🎧
             </div>
 
             <div className="home-hero-product-info">
-              <span>
-                FEATURED PRODUCT
-              </span>
+              <span>FEATURED PRODUCT</span>
 
               <h2>
                 Wireless
@@ -308,84 +278,76 @@ function Home() {
                 to="/products/1"
                 className="home-primary-button"
               >
-                Buy Now →
+                Buy Now <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* BENEFITS */}
+      {/* Benefits */}
 
       <section className="home-benefits">
         <div className="home-container home-benefits-grid">
           <div className="home-benefit">
-            <div className="home-benefit-icon">
+            <div
+              className="home-benefit-icon"
+              aria-hidden="true"
+            >
               🚚
             </div>
 
             <div>
-              <strong>
-                Fast Delivery
-              </strong>
-
-              <span>
-                Across India
-              </span>
+              <strong>Fast Delivery</strong>
+              <span>Across India</span>
             </div>
           </div>
 
           <div className="home-benefit">
-            <div className="home-benefit-icon">
+            <div
+              className="home-benefit-icon"
+              aria-hidden="true"
+            >
               🔒
             </div>
 
             <div>
-              <strong>
-                Secure Payments
-              </strong>
-
-              <span>
-                Protected checkout
-              </span>
+              <strong>Secure Payments</strong>
+              <span>Protected checkout</span>
             </div>
           </div>
 
           <div className="home-benefit">
-            <div className="home-benefit-icon">
+            <div
+              className="home-benefit-icon"
+              aria-hidden="true"
+            >
               ✓
             </div>
 
             <div>
-              <strong>
-                Trusted Vendors
-              </strong>
-
-              <span>
-                Verified sellers
-              </span>
+              <strong>Trusted Vendors</strong>
+              <span>Verified sellers</span>
             </div>
           </div>
 
           <div className="home-benefit">
-            <div className="home-benefit-icon">
+            <div
+              className="home-benefit-icon"
+              aria-hidden="true"
+            >
               ↩
             </div>
 
             <div>
-              <strong>
-                Easy Returns
-              </strong>
-
-              <span>
-                Simple return policy
-              </span>
+              <strong>Easy Returns</strong>
+              <span>Simple return policy</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CATEGORIES */}
+      {/* Categories */}
 
       <section className="home-section">
         <div className="home-container">
@@ -395,9 +357,7 @@ function Home() {
                 EXPLORE
               </span>
 
-              <h2>
-                Shop by Category
-              </h2>
+              <h2>Shop by Category</h2>
 
               <p>
                 Find everything you need
@@ -409,43 +369,41 @@ function Home() {
               to="/products"
               className="home-view-all"
             >
-              View All →
+              View All <span aria-hidden="true">→</span>
             </Link>
           </div>
 
           <div className="home-category-grid">
-            {categories.map(
-              (category) => (
-                <Link
-                  to="/products"
-                  className="home-category-card"
-                  key={category.name}
+            {categories.map((category) => (
+              <Link
+                to="/products"
+                className="home-category-card"
+                key={category.name}
+                aria-label={`Shop ${category.name}`}
+              >
+                <div
+                  className="home-category-icon"
+                  aria-hidden="true"
                 >
-                  <div className="home-category-icon">
-                    {category.icon}
-                  </div>
+                  {category.icon}
+                </div>
 
-                  <div>
-                    <span>
-                      {category.text}
-                    </span>
+                <div>
+                  <span>{category.text}</span>
 
-                    <h3>
-                      {category.name}
-                    </h3>
+                  <h3>{category.name}</h3>
 
-                    <strong>
-                      Shop Now →
-                    </strong>
-                  </div>
-                </Link>
-              )
-            )}
+                  <strong>
+                    Shop Now <span aria-hidden="true">→</span>
+                  </strong>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* PRODUCTS */}
+      {/* Featured products */}
 
       <section className="home-section home-products-section">
         <div className="home-container">
@@ -455,9 +413,7 @@ function Home() {
                 TRENDING NOW
               </span>
 
-              <h2>
-                Featured Products
-              </h2>
+              <h2>Featured Products</h2>
 
               <p>
                 Discover our most popular
@@ -469,32 +425,35 @@ function Home() {
               to="/products"
               className="home-view-all"
             >
-              View All →
+              View All <span aria-hidden="true">→</span>
             </Link>
           </div>
 
-          <div className="home-product-tabs">
-            {productTabs.map(
-              (tab) => (
-                <button
-                  type="button"
-                  key={tab}
-                  className={
-                    activeCategory ===
-                    tab
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setActiveCategory(
-                      tab
-                    )
-                  }
-                >
-                  {tab}
-                </button>
-              )
-            )}
+          <div
+            className="home-product-tabs"
+            role="tablist"
+            aria-label="Product categories"
+          >
+            {productTabs.map((tab) => (
+              <button
+                type="button"
+                key={tab}
+                role="tab"
+                aria-selected={
+                  activeCategory === tab
+                }
+                className={
+                  activeCategory === tab
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveCategory(tab)
+                }
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
           {wishlistMessage && (
@@ -507,12 +466,9 @@ function Home() {
             </div>
           )}
 
-          {filteredProducts.length ===
-          0 ? (
+          {filteredProducts.length === 0 ? (
             <div className="products-empty">
-              <h2>
-                No Products Found
-              </h2>
+              <h2>No Products Found</h2>
 
               <p>
                 No products are available
@@ -528,97 +484,93 @@ function Home() {
             </div>
           ) : (
             <div className="home-product-grid">
-              {filteredProducts.map(
-                (product) => {
-                  const isWishlistLoading =
-                    wishlistLoadingId ===
-                    product.id;
+              {filteredProducts.map((product) => {
+                const isWishlistLoading =
+                  wishlistLoadingId ===
+                  product.id;
 
-                  return (
-                    <article
-                      className="home-product-card"
-                      key={product.id}
-                    >
-                      <div className="home-product-image">
-                        <span className="home-sale-badge">
-                          SALE
+                return (
+                  <article
+                    className="home-product-card"
+                    key={product.id}
+                  >
+                    <div className="home-product-image">
+                      <span className="home-sale-badge">
+                        SALE
+                      </span>
+
+                      <button
+                        type="button"
+                        className="home-heart"
+                        aria-label={`Add ${product.name} to wishlist`}
+                        onClick={() =>
+                          handleAddToWishlist(product)
+                        }
+                        disabled={isWishlistLoading}
+                      >
+                        {isWishlistLoading
+                          ? "..."
+                          : "♡"}
+                      </button>
+
+                      <div
+                        className="home-product-emoji"
+                        role="img"
+                        aria-label={product.name}
+                      >
+                        {product.icon}
+                      </div>
+                    </div>
+
+                    <div className="home-product-content">
+                      <span className="home-product-category">
+                        {product.category}
+                      </span>
+
+                      <h3>{product.name}</h3>
+
+                      <div
+                        className="home-product-rating"
+                        aria-label={`Rated ${product.rating} out of 5`}
+                      >
+                        <span aria-hidden="true">
+                          ★★★★★
                         </span>
 
-                        <button
-                          type="button"
-                          className="home-heart"
-                          aria-label={`Add ${product.name} to wishlist`}
-                          onClick={() =>
-                            handleAddToWishlist(
-                              product
-                            )
-                          }
-                          disabled={
-                            isWishlistLoading
-                          }
-                        >
-                          {isWishlistLoading
-                            ? "..."
-                            : "♡"}
-                        </button>
-
-                        <div className="home-product-emoji">
-                          {product.icon}
-                        </div>
+                        <small>
+                          {product.rating}
+                        </small>
                       </div>
 
-                      <div className="home-product-content">
-                        <span className="home-product-category">
-                          {product.category}
+                      <div className="home-product-price">
+                        <strong>
+                          ₹{product.price}
+                        </strong>
+
+                        <del>
+                          ₹{product.oldPrice}
+                        </del>
+                      </div>
+
+                      <Link
+                        to={`/products/${product.id}`}
+                        className="home-cart-button"
+                      >
+                        View Product{" "}
+                        <span aria-hidden="true">
+                          →
                         </span>
-
-                        <h3>
-                          {product.name}
-                        </h3>
-
-                        <div className="home-product-rating">
-                          <span>
-                            ★★★★★
-                          </span>
-
-                          <small>
-                            {product.rating}
-                          </small>
-                        </div>
-
-                        <div className="home-product-price">
-                          <strong>
-                            ₹
-                            {
-                              product.price
-                            }
-                          </strong>
-
-                          <del>
-                            ₹
-                            {
-                              product.oldPrice
-                            }
-                          </del>
-                        </div>
-
-                        <Link
-                          to={`/products/${product.id}`}
-                          className="home-cart-button"
-                        >
-                          View Product →
-                        </Link>
-                      </div>
-                    </article>
-                  );
-                }
-              )}
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
       </section>
 
-      {/* DEAL */}
+      {/* Deal */}
 
       <section className="home-deal">
         <div className="home-container home-deal-grid">
@@ -642,11 +594,15 @@ function Home() {
               to="/products"
               className="home-primary-button"
             >
-              Shop Deals →
+              Shop Deals{" "}
+              <span aria-hidden="true">→</span>
             </Link>
           </div>
 
-          <div className="home-deal-visual">
+          <div
+            className="home-deal-visual"
+            aria-hidden="true"
+          >
             <div className="home-discount-circle">
               <span>UP TO</span>
               <strong>30%</strong>
@@ -660,7 +616,7 @@ function Home() {
         </div>
       </section>
 
-      {/* TRENDING */}
+      {/* Trending */}
 
       <section className="home-section">
         <div className="home-container">
@@ -670,9 +626,7 @@ function Home() {
                 BEST SELLERS
               </span>
 
-              <h2>
-                Trending Products
-              </h2>
+              <h2>Trending Products</h2>
 
               <p>
                 Products customers are
@@ -684,45 +638,45 @@ function Home() {
               to="/products"
               className="home-view-all"
             >
-              Explore All →
+              Explore All{" "}
+              <span aria-hidden="true">→</span>
             </Link>
           </div>
 
           <div className="home-trending-grid">
-            {products
-              .slice(0, 4)
-              .map((product) => (
-                <Link
-                  to={`/products/${product.id}`}
-                  className="home-trending-card"
-                  key={product.id}
+            {products.slice(0, 4).map((product) => (
+              <Link
+                to={`/products/${product.id}`}
+                className="home-trending-card"
+                key={product.id}
+                aria-label={`View ${product.name}`}
+              >
+                <div
+                  className="home-trending-image"
+                  role="img"
+                  aria-label={product.name}
                 >
-                  <div className="home-trending-image">
-                    {product.icon}
-                  </div>
+                  {product.icon}
+                </div>
 
-                  <div>
-                    <span>
-                      {product.category}
-                    </span>
+                <div>
+                  <span>{product.category}</span>
 
-                    <h3>
-                      {product.name}
-                    </h3>
+                  <h3>{product.name}</h3>
 
-                    <strong>
-                      ₹{product.price}
-                    </strong>
-                  </div>
+                  <strong>
+                    ₹{product.price}
+                  </strong>
+                </div>
 
-                  <b>→</b>
-                </Link>
-              ))}
+                <b aria-hidden="true">→</b>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* REVIEWS */}
+      {/* Reviews */}
 
       <section className="home-reviews">
         <div className="home-container">
@@ -745,7 +699,10 @@ function Home() {
 
           <div className="home-review-grid">
             <article className="home-review-card">
-              <div className="home-review-stars">
+              <div
+                className="home-review-stars"
+                aria-label="5 out of 5 stars"
+              >
                 ★★★★★
               </div>
 
@@ -756,16 +713,17 @@ function Home() {
               </p>
 
               <div className="home-review-user">
-                <div>R</div>
+                <div aria-hidden="true">R</div>
 
-                <strong>
-                  Rahul Sharma
-                </strong>
+                <strong>Rahul Sharma</strong>
               </div>
             </article>
 
             <article className="home-review-card">
-              <div className="home-review-stars">
+              <div
+                className="home-review-stars"
+                aria-label="5 out of 5 stars"
+              >
                 ★★★★★
               </div>
 
@@ -776,16 +734,17 @@ function Home() {
               </p>
 
               <div className="home-review-user">
-                <div>A</div>
+                <div aria-hidden="true">A</div>
 
-                <strong>
-                  Aman Khan
-                </strong>
+                <strong>Aman Khan</strong>
               </div>
             </article>
 
             <article className="home-review-card">
-              <div className="home-review-stars">
+              <div
+                className="home-review-stars"
+                aria-label="5 out of 5 stars"
+              >
                 ★★★★★
               </div>
 
@@ -796,18 +755,16 @@ function Home() {
               </p>
 
               <div className="home-review-user">
-                <div>S</div>
+                <div aria-hidden="true">S</div>
 
-                <strong>
-                  Sara Ali
-                </strong>
+                <strong>Sara Ali</strong>
               </div>
             </article>
           </div>
         </div>
       </section>
 
-      {/* NEWSLETTER */}
+      {/* Newsletter */}
 
       <section className="home-newsletter">
         <div className="home-container home-newsletter-inner">
@@ -816,9 +773,7 @@ function Home() {
               STAY UPDATED
             </span>
 
-            <h2>
-              Get the Latest Deals
-            </h2>
+            <h2>Get the Latest Deals</h2>
 
             <p>
               Subscribe for new products,
@@ -829,17 +784,13 @@ function Home() {
 
           <div>
             <form
-              onSubmit={
-                handleNewsletterSubmit
-              }
+              onSubmit={handleNewsletterSubmit}
               className="home-newsletter-form"
             >
               <input
                 type="email"
                 placeholder="Enter your email address"
-                value={
-                  newsletterEmail
-                }
+                value={newsletterEmail}
                 onChange={(event) =>
                   setNewsletterEmail(
                     event.target.value
@@ -851,7 +802,8 @@ function Home() {
               />
 
               <button type="submit">
-                Subscribe →
+                Subscribe{" "}
+                <span aria-hidden="true">→</span>
               </button>
             </form>
 

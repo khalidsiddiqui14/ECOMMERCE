@@ -58,6 +58,7 @@ function Settings() {
     ) !== "false"
   );
 
+  // Load notification preferences.
   const loadPreferences =
     useCallback(async () => {
       setLoadingPreferences(true);
@@ -86,52 +87,10 @@ function Settings() {
     }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    loadPreferences();
+  }, [loadPreferences]);
 
-    const fetchPreferences =
-      async () => {
-        setLoadingPreferences(true);
-        setError("");
-
-        try {
-          const data =
-            await getNotificationPreferences();
-
-          if (!cancelled) {
-            setPreferences(data);
-          }
-        } catch (error) {
-          console.error(
-            "SETTINGS PREFERENCES ERROR:",
-            error
-          );
-
-          if (!cancelled) {
-            setError(
-              error.response?.data
-                ?.detail ||
-                error.response?.data
-                  ?.message ||
-                error.message ||
-                "Notification preferences load nahi ho paayi."
-            );
-          }
-        } finally {
-          if (!cancelled) {
-            setLoadingPreferences(
-              false
-            );
-          }
-        }
-      };
-
-    fetchPreferences();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // Apply and persist the selected theme.
   useEffect(() => {
     const root =
       document.documentElement;
@@ -158,6 +117,7 @@ function Settings() {
     );
   }, [theme]);
 
+  // Save language preference locally.
   const handleLanguageChange = (
     event
   ) => {
@@ -172,6 +132,7 @@ function Settings() {
     );
   };
 
+  // Save currency preference locally.
   const handleCurrencyChange = (
     event
   ) => {
@@ -186,6 +147,7 @@ function Settings() {
     );
   };
 
+  // Save AI assistant preference locally.
   const handleAiAssistantChange = (
     event
   ) => {
@@ -200,6 +162,7 @@ function Settings() {
     );
   };
 
+  // Save product recommendation preference locally.
   const handleProductRecommendationsChange =
     (event) => {
       const value =
@@ -215,6 +178,7 @@ function Settings() {
       );
     };
 
+  // Update notification preference with rollback on failure.
   const handlePreferenceChange =
     async (
       field,
@@ -271,6 +235,7 @@ function Settings() {
       }
     };
 
+  // Scroll to a settings section.
   const scrollToSection = (
     sectionId
   ) => {
@@ -305,6 +270,35 @@ function Settings() {
     );
   }
 
+  if (error && !preferences) {
+    return (
+      <main className="settings-page">
+        <div className="settings-container">
+          <div
+            className="products-empty"
+            role="alert"
+          >
+            <h2>
+              Unable to Load Settings
+            </h2>
+
+            <p>{error}</p>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={
+                loadPreferences
+              }
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="settings-page">
       <div className="settings-container">
@@ -326,16 +320,9 @@ function Settings() {
           <div
             className="products-empty"
             role="alert"
+            aria-live="assertive"
           >
             <p>{error}</p>
-
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={loadPreferences}
-            >
-              Try Again
-            </button>
           </div>
         )}
 
@@ -449,8 +436,7 @@ function Settings() {
             <button
               type="button"
               className={`settings-nav-item ${
-                activeSection ===
-                "ai"
+                activeSection === "ai"
                   ? "active"
                   : ""
               }`}
@@ -545,9 +531,7 @@ function Settings() {
             >
               <div className="settings-card-heading">
                 <div>
-                  <h2>
-                    Account
-                  </h2>
+                  <h2>Account</h2>
 
                   <p>
                     Manage your personal
@@ -583,9 +567,7 @@ function Settings() {
             >
               <div className="settings-card-heading">
                 <div>
-                  <h2>
-                    Security
-                  </h2>
+                  <h2>Security</h2>
 
                   <p>
                     Keep your account secure.
@@ -832,9 +814,7 @@ function Settings() {
             >
               <div className="settings-card-heading">
                 <div>
-                  <h2>
-                    Shopping
-                  </h2>
+                  <h2>Shopping</h2>
 
                   <p>
                     Manage your shopping

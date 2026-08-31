@@ -5,15 +5,18 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+
 function Navbar() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(() => {
-    const token =
-      localStorage.getItem("access_token");
+    const token = localStorage.getItem(
+      "access_token"
+    );
 
-    const storedUser =
-      localStorage.getItem("user");
+    const storedUser = localStorage.getItem(
+      "user"
+    );
 
     if (!token || !storedUser) {
       return null;
@@ -33,14 +36,18 @@ function Navbar() {
     }
   });
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
+
+  const [userMenuOpen, setUserMenuOpen] =
+    useState(false);
+
 
   useEffect(() => {
     const loadUser = () => {
-      const token =
-        localStorage.getItem(
-          "access_token"
-        );
+      const token = localStorage.getItem(
+        "access_token"
+      );
 
       const storedUser =
         localStorage.getItem("user");
@@ -63,9 +70,11 @@ function Navbar() {
       }
     };
 
+
     const handleAuthChange = () => {
       loadUser();
     };
+
 
     window.addEventListener(
       "auth-change",
@@ -76,6 +85,7 @@ function Navbar() {
       "storage",
       handleAuthChange
     );
+
 
     return () => {
       window.removeEventListener(
@@ -90,13 +100,27 @@ function Navbar() {
     };
   }, []);
 
+
+  const closeMenus = () => {
+    setMobileMenuOpen(false);
+    setUserMenuOpen(false);
+  };
+
+
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    localStorage.removeItem(
+      "access_token"
+    );
+
+    localStorage.removeItem(
+      "refresh_token"
+    );
+
     localStorage.removeItem("user");
 
     setUser(null);
-    setMenuOpen(false);
+
+    closeMenus();
 
     window.dispatchEvent(
       new Event("auth-change")
@@ -107,6 +131,7 @@ function Navbar() {
     });
   };
 
+
   const navLinkClass = ({
     isActive,
   }) =>
@@ -116,139 +141,158 @@ function Navbar() {
         : ""
     }`;
 
+
+  const handleMobileMenuToggle = () => {
+    setMobileMenuOpen(
+      (previous) => !previous
+    );
+
+    setUserMenuOpen(false);
+  };
+
+
+  const handleUserMenuToggle = () => {
+    setUserMenuOpen(
+      (previous) => !previous
+    );
+
+    setMobileMenuOpen(false);
+  };
+
+
   return (
     <header className="navbar">
       <div className="navbar-container">
+
         <Link
           to="/"
           className="logo"
-          onClick={() =>
-            setMenuOpen(false)
-          }
+          onClick={closeMenus}
         >
           E-Shop
         </Link>
 
+
         <nav
           className={`nav-links${
-            menuOpen
+            mobileMenuOpen
               ? " nav-links-open"
               : ""
           }`}
+          aria-label="Primary navigation"
         >
           <NavLink
             to="/"
             className={navLinkClass}
-            onClick={() =>
-              setMenuOpen(false)
-            }
+            onClick={closeMenus}
           >
             Home
           </NavLink>
 
+
           <NavLink
             to="/products"
             className={navLinkClass}
-            onClick={() =>
-              setMenuOpen(false)
-            }
+            onClick={closeMenus}
           >
             Products
           </NavLink>
+
 
           {user && (
             <>
               <NavLink
                 to="/wishlist"
                 className={navLinkClass}
-                onClick={() =>
-                  setMenuOpen(false)
-                }
+                onClick={closeMenus}
               >
                 Wishlist
               </NavLink>
 
+
               <NavLink
                 to="/cart"
                 className={navLinkClass}
-                onClick={() =>
-                  setMenuOpen(false)
-                }
+                onClick={closeMenus}
               >
                 Cart
               </NavLink>
 
+
               <NavLink
                 to="/orders"
                 className={navLinkClass}
-                onClick={() =>
-                  setMenuOpen(false)
-                }
+                onClick={closeMenus}
               >
                 Orders
+              </NavLink>
+
+
+              <NavLink
+                to="/settings"
+                className={navLinkClass}
+                onClick={closeMenus}
+              >
+                Settings
               </NavLink>
             </>
           )}
 
-          {user && (
-            <NavLink
-              to="/settings"
-              className={navLinkClass}
-              onClick={() =>
-                setMenuOpen(false)
-              }
-            >
-              Settings
-            </NavLink>
-          )}
 
           {user?.role === "VENDOR" && (
             <NavLink
               to="/vendor/dashboard"
               className={navLinkClass}
-              onClick={() =>
-                setMenuOpen(false)
-              }
+              onClick={closeMenus}
             >
               Vendor Dashboard
             </NavLink>
           )}
         </nav>
 
+
         <div className="nav-actions">
+
           {!user ? (
             <>
               <Link
                 to="/login"
                 className="nav-auth-link"
+                onClick={closeMenus}
               >
                 Login
               </Link>
 
+
               <Link
                 to="/register"
                 className="nav-register-link"
+                onClick={closeMenus}
               >
                 Register
               </Link>
             </>
           ) : (
             <div className="nav-user-menu">
+
               <button
                 type="button"
                 className="nav-user-button"
-                onClick={() =>
-                  setMenuOpen(
-                    (previous) =>
-                      !previous
-                  )
+                onClick={
+                  handleUserMenuToggle
                 }
-                aria-expanded={menuOpen}
+                aria-expanded={
+                  userMenuOpen
+                }
                 aria-haspopup="menu"
               >
-                <span className="nav-user-icon">
+                <span
+                  className="nav-user-icon"
+                  aria-hidden="true"
+                >
                   👤
                 </span>
+
 
                 <span className="nav-user-name">
                   {user.username ||
@@ -256,57 +300,57 @@ function Navbar() {
                     "Account"}
                 </span>
 
-                <span className="nav-user-arrow">
-                  {menuOpen
+
+                <span
+                  className="nav-user-arrow"
+                  aria-hidden="true"
+                >
+                  {userMenuOpen
                     ? "▲"
                     : "▼"}
                 </span>
               </button>
 
-              {menuOpen && (
+
+              {userMenuOpen && (
                 <div
                   className="nav-user-dropdown"
                   role="menu"
+                  aria-label="Account menu"
                 >
                   <Link
                     to="/profile"
                     role="menuitem"
-                    onClick={() =>
-                      setMenuOpen(false)
-                    }
+                    onClick={closeMenus}
                   >
                     Profile
                   </Link>
 
+
                   <Link
                     to="/settings"
                     role="menuitem"
-                    onClick={() =>
-                      setMenuOpen(false)
-                    }
+                    onClick={closeMenus}
                   >
                     Settings
                   </Link>
 
-                  {user?.role ===
-                    "VENDOR" && (
+
+                  {user.role === "VENDOR" && (
                     <Link
                       to="/vendor/dashboard"
                       role="menuitem"
-                      onClick={() =>
-                        setMenuOpen(false)
-                      }
+                      onClick={closeMenus}
                     >
                       Vendor Dashboard
                     </Link>
                   )}
 
+
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={
-                      handleLogout
-                    }
+                    onClick={handleLogout}
                   >
                     Logout
                   </button>
@@ -315,24 +359,35 @@ function Navbar() {
             </div>
           )}
 
+
           <button
             type="button"
             className="navbar-menu-button"
-            onClick={() =>
-              setMenuOpen(
-                (previous) =>
-                  !previous
-              )
+            onClick={
+              handleMobileMenuToggle
             }
-            aria-label="Toggle navigation menu"
-            aria-expanded={menuOpen}
+            aria-label={
+              mobileMenuOpen
+                ? "Close navigation menu"
+                : "Open navigation menu"
+            }
+            aria-expanded={
+              mobileMenuOpen
+            }
+            aria-controls="primary-navigation"
           >
-            ☰
+            <span aria-hidden="true">
+              {mobileMenuOpen
+                ? "✕"
+                : "☰"}
+            </span>
           </button>
+
         </div>
       </div>
     </header>
   );
 }
+
 
 export default Navbar;

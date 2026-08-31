@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { getProfile } from "../services/userService";
@@ -8,56 +12,17 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadProfile = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const data = await getProfile();
-
-      if (!data) {
-        throw new Error(
-          "Profile data was not returned."
-        );
+  // Load profile
+  const loadProfile = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
       }
 
-      setUser(data);
-
-      // Keep local user information in sync.
-      localStorage.setItem(
-        "user",
-        JSON.stringify(data)
-      );
-    } catch (error) {
-      console.error(
-        "PROFILE ERROR:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Profile load nahi ho paaya."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchProfile = async () => {
-      setLoading(true);
       setError("");
 
       try {
         const data = await getProfile();
-
-        if (cancelled) {
-          return;
-        }
 
         if (!data) {
           throw new Error(
@@ -67,6 +32,7 @@ function Profile() {
 
         setUser(data);
 
+        // Keep local user information in sync.
         localStorage.setItem(
           "user",
           JSON.stringify(data)
@@ -77,27 +43,24 @@ function Profile() {
           error
         );
 
-        if (!cancelled) {
-          setError(
-            error.response?.data?.detail ||
-              error.response?.data?.message ||
-              error.message ||
-              "Profile load nahi ho paaya."
-          );
-        }
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Profile load nahi ho paaya."
+        );
       } finally {
-        if (!cancelled) {
+        if (showLoading) {
           setLoading(false);
         }
       }
-    };
+    },
+    []
+  );
 
-    fetchProfile();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   if (loading) {
     return (
@@ -130,7 +93,9 @@ function Profile() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={loadProfile}
+              onClick={() =>
+                loadProfile()
+              }
             >
               Try Again
             </button>
@@ -159,17 +124,17 @@ function Profile() {
   const role =
     user.role || "MEMBER";
 
-  const avatar =
-    username.charAt(0).toUpperCase();
+  const avatar = username
+    .charAt(0)
+    .toUpperCase();
 
-  const formattedRole =
-    role
-      .toLowerCase()
-      .replace(
-        /^./,
-        (character) =>
-          character.toUpperCase()
-      );
+  const formattedRole = role
+    .toLowerCase()
+    .replace(
+      /^./,
+      (character) =>
+        character.toUpperCase()
+    );
 
   return (
     <main className="profile-page">
@@ -183,9 +148,7 @@ function Profile() {
           </div>
 
           <div>
-            <h1>
-              {username}
-            </h1>
+            <h1>{username}</h1>
 
             <p>
               Manage your account
@@ -211,9 +174,7 @@ function Profile() {
             </div>
 
             <div className="profile-field">
-              <span>
-                Email
-              </span>
+              <span>Email</span>
 
               <strong>
                 {email}
@@ -221,9 +182,7 @@ function Profile() {
             </div>
 
             <div className="profile-field">
-              <span>
-                Phone
-              </span>
+              <span>Phone</span>
 
               <strong>
                 {phone}

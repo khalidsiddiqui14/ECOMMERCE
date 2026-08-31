@@ -29,6 +29,7 @@ function Notifications() {
   const [markingAll, setMarkingAll] =
     useState(false);
 
+  // Load notifications.
   const loadNotifications =
     useCallback(
       async (isRefresh = false) => {
@@ -47,7 +48,9 @@ function Notifications() {
           const notificationList =
             Array.isArray(data)
               ? data
-              : Array.isArray(data?.results)
+              : Array.isArray(
+                    data?.results
+                )
                 ? data.results
                 : [];
 
@@ -80,62 +83,8 @@ function Notifications() {
     );
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchNotifications =
-      async () => {
-        setLoading(true);
-        setError("");
-
-        try {
-          const data =
-            await getNotifications();
-
-          if (cancelled) {
-            return;
-          }
-
-          const notificationList =
-            Array.isArray(data)
-              ? data
-              : Array.isArray(
-                    data?.results
-                  )
-                ? data.results
-                : [];
-
-          setNotifications(
-            notificationList
-          );
-        } catch (error) {
-          console.error(
-            "NOTIFICATIONS ERROR:",
-            error
-          );
-
-          if (!cancelled) {
-            setError(
-              error.response?.data
-                ?.detail ||
-                error.response?.data
-                  ?.message ||
-                error.message ||
-                "Notifications load nahi ho paayi."
-            );
-          }
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-          }
-        }
-      };
-
-    fetchNotifications();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    loadNotifications();
+  }, [loadNotifications]);
 
   const unreadCount = useMemo(
     () =>
@@ -146,57 +95,60 @@ function Notifications() {
     [notifications]
   );
 
-  const handleMarkRead =
-    async (notification) => {
-      if (
-        !notification?.id ||
-        notification.is_read ||
-        markingId === notification.id ||
-        markingAll
-      ) {
-        return;
-      }
+  // Mark one notification as read.
+  const handleMarkRead = async (
+    notification
+  ) => {
+    if (
+      !notification?.id ||
+      notification.is_read ||
+      markingId === notification.id ||
+      markingAll
+    ) {
+      return;
+    }
 
-      setMarkingId(notification.id);
-      setError("");
+    setMarkingId(notification.id);
+    setError("");
 
-      try {
-        const updated =
-          await markNotificationRead(
+    try {
+      const updated =
+        await markNotificationRead(
+          notification.id
+        );
+
+      setNotifications(
+        (previous) =>
+          previous.map((item) =>
+            item.id ===
             notification.id
-          );
+              ? {
+                  ...item,
+                  ...updated,
+                  is_read: true,
+                }
+              : item
+          )
+      );
+    } catch (error) {
+      console.error(
+        "MARK NOTIFICATION READ ERROR:",
+        error
+      );
 
-        setNotifications(
-          (previous) =>
-            previous.map((item) =>
-              item.id ===
-              notification.id
-                ? {
-                    ...item,
-                    ...updated,
-                    is_read: true,
-                  }
-                : item
-            )
-        );
-      } catch (error) {
-        console.error(
-          "MARK NOTIFICATION READ ERROR:",
-          error
-        );
-
-        setError(
+      setError(
+        error.response?.data
+          ?.detail ||
           error.response?.data
-            ?.detail ||
-            error.response?.data
-              ?.message ||
-            "Notification read mark nahi ho paayi."
-        );
-      } finally {
-        setMarkingId(null);
-      }
-    };
+            ?.message ||
+          "Notification read mark nahi ho paayi."
+      );
+    } finally {
+      setMarkingId(null);
+    }
+  };
 
+  // Mark all unread notifications as read.
   const handleMarkAllRead =
     async () => {
       const unreadNotifications =
@@ -206,8 +158,7 @@ function Notifications() {
         );
 
       if (
-        unreadNotifications.length ===
-        0
+        unreadNotifications.length === 0
       ) {
         return;
       }
@@ -281,27 +232,26 @@ function Notifications() {
       }
     };
 
-  const getNotificationIcon =
-    (type) => {
-      switch (
-        type?.toLowerCase()
-      ) {
-        case "success":
-          return "✓";
+  const getNotificationIcon = (
+    type
+  ) => {
+    switch (type?.toLowerCase()) {
+      case "success":
+        return "✓";
 
-        case "warning":
-          return "!";
+      case "warning":
+        return "!";
 
-        case "error":
-          return "×";
+      case "error":
+        return "×";
 
-        case "info":
-          return "🚚";
+      case "info":
+        return "🚚";
 
-        default:
-          return "🔔";
-      }
-    };
+      default:
+        return "🔔";
+    }
+  };
 
   const formatDate = (
     createdAt
@@ -314,7 +264,11 @@ function Notifications() {
       createdAt
     );
 
-    if (Number.isNaN(date.getTime())) {
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
       return "";
     }
 
@@ -399,13 +353,13 @@ function Notifications() {
           <div
             className="auth-error"
             role="alert"
+            aria-live="assertive"
           >
             {error}
           </div>
         )}
 
-        {notifications.length ===
-        0 ? (
+        {notifications.length === 0 ? (
           <div className="products-empty">
             <h2>
               No Notifications
@@ -420,9 +374,7 @@ function Notifications() {
               type="button"
               className="btn btn-primary"
               onClick={() =>
-                loadNotifications(
-                  true
-                )
+                loadNotifications(true)
               }
               disabled={refreshing}
             >
@@ -435,11 +387,10 @@ function Notifications() {
           <div className="notifications-list">
             {notifications.map(
               (notification) => {
-                const type =
-                  (
-                    notification.type ||
-                    "info"
-                  ).toLowerCase();
+                const type = (
+                  notification.type ||
+                  "info"
+                ).toLowerCase();
 
                 const isUnread =
                   !notification.is_read;

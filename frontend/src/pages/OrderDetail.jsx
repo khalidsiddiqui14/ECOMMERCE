@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+import {
+  Link,
+  useParams,
+} from "react-router-dom";
 
 import { getOrder } from "../services/orderService";
 
@@ -10,50 +17,17 @@ function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadOrder = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const data = await getOrder(id);
-
-      if (!data) {
-        throw new Error(
-          "Order data was not returned."
-        );
+  // Load order
+  const loadOrder = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
       }
 
-      setOrder(data);
-    } catch (error) {
-      console.error(
-        "ORDER DETAIL ERROR:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Order load nahi ho paaya."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchOrder = async () => {
-      setLoading(true);
       setError("");
 
       try {
         const data = await getOrder(id);
-
-        if (cancelled) {
-          return;
-        }
 
         if (!data) {
           throw new Error(
@@ -68,27 +42,24 @@ function OrderDetail() {
           error
         );
 
-        if (!cancelled) {
-          setError(
-            error.response?.data?.detail ||
-              error.response?.data?.message ||
-              error.message ||
-              "Order load nahi ho paaya."
-          );
-        }
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Order load nahi ho paaya."
+        );
       } finally {
-        if (!cancelled) {
+        if (showLoading) {
           setLoading(false);
         }
       }
-    };
+    },
+    [id]
+  );
 
-    fetchOrder();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
 
   if (loading) {
     return (
@@ -121,7 +92,9 @@ function OrderDetail() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={loadOrder}
+              onClick={() =>
+                loadOrder()
+              }
             >
               Try Again
             </button>
@@ -236,9 +209,7 @@ function OrderDetail() {
         </div>
 
         <section className="order-detail-card">
-          <h2>
-            Items
-          </h2>
+          <h2>Items</h2>
 
           {items.length === 0 ? (
             <div className="products-empty">

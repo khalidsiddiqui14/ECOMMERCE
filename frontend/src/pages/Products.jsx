@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -9,23 +10,17 @@ import { getProducts } from "../services/productService";
 import { addToCart } from "../services/cartService";
 
 function Products() {
-  const [products, setProducts] =
-    useState([]);
+  const [products, setProducts] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [category, setCategory] =
-    useState("");
+  const [category, setCategory] = useState("");
 
-  const [sort, setSort] =
-    useState("latest");
+  const [sort, setSort] = useState("latest");
 
   const [addingProductId, setAddingProductId] =
     useState(null);
@@ -36,93 +31,59 @@ function Products() {
   const [cartError, setCartError] =
     useState("");
 
-  // Load Products
-  const loadProducts = async () => {
-    setLoading(true);
-    setError("");
+  // Load products
+  const loadProducts = useCallback(
+    async (isMounted = true) => {
+      setLoading(true);
+      setError("");
 
-    try {
-      const data =
-        await getProducts();
+      try {
+        const data = await getProducts();
 
-      const productList =
-        Array.isArray(data)
+        if (!isMounted) {
+          return;
+        }
+
+        const productList = Array.isArray(data)
           ? data
-          : Array.isArray(
-                data?.results
-              )
+          : Array.isArray(data?.results)
             ? data.results
             : [];
 
-      setProducts(productList);
-    } catch (error) {
-      console.error(
-        "PRODUCTS ERROR:",
-        error
-      );
+        setProducts(productList);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
 
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          "Products load nahi ho paaye."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        console.error(
+          "PRODUCTS ERROR:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            "Products load nahi ho paaye."
+        );
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    let cancelled = false;
+    let isMounted = true;
 
-    const fetchProducts =
-      async () => {
-        try {
-          const data =
-            await getProducts();
-
-          if (cancelled) {
-            return;
-          }
-
-          const productList =
-            Array.isArray(data)
-              ? data
-              : Array.isArray(
-                    data?.results
-                  )
-                ? data.results
-                : [];
-
-          setProducts(productList);
-          setError("");
-        } catch (error) {
-          if (cancelled) {
-            return;
-          }
-
-          console.error(
-            "PRODUCTS ERROR:",
-            error
-          );
-
-          setError(
-            error.response?.data?.detail ||
-              error.response?.data?.message ||
-              "Products load nahi ho paaye."
-          );
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-          }
-        }
-      };
-
-    fetchProducts();
+    loadProducts(isMounted);
 
     return () => {
-      cancelled = true;
+      isMounted = false;
     };
-  }, []);
+  }, [loadProducts]);
 
   const categories = useMemo(() => {
     const values = products
@@ -136,131 +97,90 @@ function Products() {
     return [
       ...new Set(values),
     ].sort((a, b) =>
-      String(a).localeCompare(
-        String(b)
-      )
+      String(a).localeCompare(String(b))
     );
   }, [products]);
 
-  const filteredProducts =
-    useMemo(() => {
-      let result = [
-        ...products,
-      ];
+  const filteredProducts = useMemo(() => {
+    let result = [...products];
 
-      const searchValue =
-        search
-          .trim()
-          .toLowerCase();
+    const searchValue = search
+      .trim()
+      .toLowerCase();
 
-      if (searchValue) {
-        result =
-          result.filter(
-            (product) => {
-              const name =
-                String(
-                  product.name ||
-                    ""
-                ).toLowerCase();
+    if (searchValue) {
+      result = result.filter((product) => {
+        const name = String(
+          product.name || ""
+        ).toLowerCase();
 
-              const description =
-                String(
-                  product.description ||
-                    ""
-                ).toLowerCase();
+        const description = String(
+          product.description || ""
+        ).toLowerCase();
 
-              const categoryName =
-                String(
-                  product.category_name ||
-                    product.category ||
-                    ""
-                ).toLowerCase();
+        const categoryName = String(
+          product.category_name ||
+            product.category ||
+            ""
+        ).toLowerCase();
 
-              return (
-                name.includes(
-                  searchValue
-                ) ||
-                description.includes(
-                  searchValue
-                ) ||
-                categoryName.includes(
-                  searchValue
-                )
-              );
-            }
-          );
-      }
-
-      if (category) {
-        result =
-          result.filter(
-            (product) => {
-              const productCategory =
-                String(
-                  product.category_name ||
-                    product.category ||
-                    ""
-                );
-
-              return (
-                productCategory ===
-                category
-              );
-            }
-          );
-      }
-
-      if (sort === "price-low") {
-        result.sort(
-          (a, b) =>
-            Number(
-              a.price || 0
-            ) -
-            Number(
-              b.price || 0
-            )
+        return (
+          name.includes(searchValue) ||
+          description.includes(searchValue) ||
+          categoryName.includes(searchValue)
         );
-      }
+      });
+    }
 
-      if (sort === "price-high") {
-        result.sort(
-          (a, b) =>
-            Number(
-              b.price || 0
-            ) -
-            Number(
-              a.price || 0
-            )
+    if (category) {
+      result = result.filter((product) => {
+        const productCategory = String(
+          product.category_name ||
+            product.category ||
+            ""
         );
-      }
 
-      if (sort === "latest") {
-        result.sort(
-          (a, b) => {
-            const dateA =
-              new Date(
-                a.created_at || 0
-              ).getTime();
+        return productCategory === category;
+      });
+    }
 
-            const dateB =
-              new Date(
-                b.created_at || 0
-              ).getTime();
+    if (sort === "price-low") {
+      result.sort(
+        (a, b) =>
+          Number(a.price || 0) -
+          Number(b.price || 0)
+      );
+    }
 
-            return (
-              dateB - dateA
-            );
-          }
-        );
-      }
+    if (sort === "price-high") {
+      result.sort(
+        (a, b) =>
+          Number(b.price || 0) -
+          Number(a.price || 0)
+      );
+    }
 
-      return result;
-    }, [
-      products,
-      search,
-      category,
-      sort,
-    ]);
+    if (sort === "latest") {
+      result.sort((a, b) => {
+        const dateA = new Date(
+          a.created_at || 0
+        ).getTime();
+
+        const dateB = new Date(
+          b.created_at || 0
+        ).getTime();
+
+        return dateB - dateA;
+      });
+    }
+
+    return result;
+  }, [
+    products,
+    search,
+    category,
+    sort,
+  ]);
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
@@ -275,60 +195,49 @@ function Products() {
     setCartError("");
   };
 
-  const handleAddToCart =
-    async (product) => {
-      if (!product?.id) {
-        return;
-      }
+  const handleAddToCart = async (product) => {
+    if (!product?.id) {
+      return;
+    }
 
-      const hasStock =
-        product.stock ===
-          undefined ||
-        Number(product.stock) >
-          0;
+    const hasStock =
+      product.stock === undefined ||
+      Number(product.stock) > 0;
 
-      if (!hasStock) {
-        return;
-      }
+    if (!hasStock) {
+      return;
+    }
 
-      setAddingProductId(
-        product.id
+    setAddingProductId(product.id);
+    setCartMessage("");
+    setCartError("");
+
+    try {
+      await addToCart(
+        product.id,
+        1
       );
 
-      setCartMessage("");
-      setCartError("");
+      setCartMessage(
+        `${
+          product.name || "Product"
+        } cart mein add ho gaya.`
+      );
+    } catch (error) {
+      console.error(
+        "ADD TO CART ERROR:",
+        error
+      );
 
-      try {
-        await addToCart(
-          product.id,
-          1
-        );
-
-        setCartMessage(
-          `${
-            product.name ||
-            "Product"
-          } cart mein add ho gaya.`
-        );
-      } catch (error) {
-        console.error(
-          "ADD TO CART ERROR:",
-          error
-        );
-
-        setCartError(
-          error.response?.data
-            ?.detail ||
-            error.response?.data
-              ?.message ||
-            "Product cart mein add nahi ho paaya."
-        );
-      } finally {
-        setAddingProductId(
-          null
-        );
-      }
-    };
+      setCartError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Product cart mein add nahi ho paaya."
+      );
+    } finally {
+      setAddingProductId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -365,7 +274,10 @@ function Products() {
           </p>
         </section>
 
-        <div className="products-error">
+        <div
+          className="products-error"
+          role="alert"
+        >
           <h2>
             Unable to load products
           </h2>
@@ -375,8 +287,8 @@ function Products() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={
-              loadProducts
+            onClick={() =>
+              loadProducts()
             }
           >
             Try Again
@@ -411,13 +323,17 @@ function Products() {
         <div
           className="auth-error"
           role="alert"
+          aria-live="assertive"
         >
           {cartError}
         </div>
       )}
 
       <section className="products-content">
-        <aside className="products-filter">
+        <aside
+          className="products-filter"
+          aria-label="Product filters"
+        >
           <h3>Filters</h3>
 
           <div className="filter-group">
@@ -438,18 +354,14 @@ function Products() {
                 All Categories
               </option>
 
-              {categories.map(
-                (item) => (
-                  <option
-                    key={String(
-                      item
-                    )}
-                    value={item}
-                  >
-                    {item}
-                  </option>
-                )
-              )}
+              {categories.map((item) => (
+                <option
+                  key={String(item)}
+                  value={item}
+                >
+                  {item}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -485,9 +397,7 @@ function Products() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={
-                clearFilters
-              }
+              onClick={clearFilters}
             >
               Clear Filters
             </button>
@@ -502,11 +412,10 @@ function Products() {
                 filteredProducts.length
               }{" "}
               of{" "}
-              {products.length}{" "}
-              Products
+              {products.length} Products
             </span>
 
-            <div>
+            <div className="product-search">
               <label
                 htmlFor="product-search"
                 className="sr-only"
@@ -542,9 +451,11 @@ function Products() {
             </div>
           </div>
 
-          {filteredProducts.length ===
-          0 ? (
-            <div className="products-empty">
+          {filteredProducts.length === 0 ? (
+            <div
+              className="products-empty"
+              role="status"
+            >
               <h2>
                 No Products Found
               </h2>
@@ -558,9 +469,7 @@ function Products() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={
-                    clearFilters
-                  }
+                  onClick={clearFilters}
                 >
                   Clear Filters
                 </button>
@@ -570,10 +479,9 @@ function Products() {
             <div className="products-grid">
               {filteredProducts.map(
                 (product) => {
-                  const stock =
-                    Number(
-                      product.stock
-                    );
+                  const stock = Number(
+                    product.stock
+                  );
 
                   const hasStock =
                     product.stock ===
@@ -595,16 +503,13 @@ function Products() {
 
                   const productPrice =
                     Number(
-                      product.price ||
-                        0
+                      product.price || 0
                     );
 
                   return (
                     <article
                       className="shop-product-card"
-                      key={
-                        product.id
-                      }
+                      key={product.id}
                     >
                       <Link
                         to={`/products/${product.id}`}
@@ -616,22 +521,33 @@ function Products() {
                               src={
                                 product.image
                               }
-                              alt={
-                                productName
-                              }
+                              alt={productName}
                               loading="lazy"
                               onError={(
                                 event
                               ) => {
                                 event.currentTarget.style.display =
                                   "none";
+
+                                event.currentTarget.parentElement.classList.add(
+                                  "image-fallback"
+                                );
                               }}
                             />
                           ) : (
-                            <span aria-hidden="true">
+                            <span
+                              aria-hidden="true"
+                            >
                               📦
                             </span>
                           )}
+
+                          <span
+                            className="image-fallback-icon"
+                            aria-hidden="true"
+                          >
+                            📦
+                          </span>
                         </div>
                       </Link>
 
@@ -643,9 +559,7 @@ function Products() {
                         </span>
 
                         <h3>
-                          {
-                            productName
-                          }
+                          {productName}
                         </h3>
 
                         <p className="shop-product-price">

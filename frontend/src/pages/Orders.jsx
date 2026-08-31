@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { getOrders } from "../services/orderService";
@@ -8,50 +12,17 @@ function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  // Load orders
+  const loadOrders = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
 
-    try {
-      const data = await getOrders();
-
-      const orderList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.results)
-          ? data.results
-          : [];
-
-      setOrders(orderList);
-    } catch (error) {
-      console.error(
-        "ORDERS ERROR:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Orders load nahi ho paaye."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchOrders = async () => {
-      setLoading(true);
       setError("");
 
       try {
         const data = await getOrders();
-
-        if (cancelled) {
-          return;
-        }
 
         const orderList = Array.isArray(data)
           ? data
@@ -66,27 +37,24 @@ function Orders() {
           error
         );
 
-        if (!cancelled) {
-          setError(
-            error.response?.data?.detail ||
-              error.response?.data?.message ||
-              error.message ||
-              "Orders load nahi ho paaye."
-          );
-        }
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Orders load nahi ho paaye."
+        );
       } finally {
-        if (!cancelled) {
+        if (showLoading) {
           setLoading(false);
         }
       }
-    };
+    },
+    []
+  );
 
-    fetchOrders();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   if (loading) {
     return (
@@ -115,7 +83,7 @@ function Orders() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={loadOrders}
+            onClick={() => loadOrders()}
           >
             Try Again
           </button>
@@ -129,9 +97,7 @@ function Orders() {
       <div className="orders-container">
         <div className="orders-header">
           <div>
-            <h1>
-              My Orders
-            </h1>
+            <h1>My Orders</h1>
 
             <p>
               {orders.length} order
@@ -206,7 +172,7 @@ function Orders() {
                     )
                   : "-";
 
-              const status =
+              const orderStatus =
                 order.status ||
                 "PLACED";
 
@@ -228,9 +194,9 @@ function Orders() {
 
                     <div
                       className="order-status"
-                      aria-label={`Order status: ${status}`}
+                      aria-label={`Order status: ${orderStatus}`}
                     >
-                      {status}
+                      {orderStatus}
                     </div>
                   </div>
 

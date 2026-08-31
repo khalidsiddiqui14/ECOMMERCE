@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
 
 import { registerUser } from "../services/authService";
 
@@ -13,11 +16,25 @@ function getPasswordStrength(password) {
 
   let score = 0;
 
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/[0-9]/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  if (password.length >= 8) {
+    score += 1;
+  }
+
+  if (/[A-Z]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[a-z]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[0-9]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[^A-Za-z0-9]/.test(password)) {
+    score += 1;
+  }
 
   const labels = {
     1: "Very Weak",
@@ -36,10 +53,18 @@ function getPasswordStrength(password) {
 function Register() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [phone, setPhone] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
   const [confirmPassword, setConfirmPassword] =
     useState("");
 
@@ -49,9 +74,14 @@ function Register() {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [success, setSuccess] =
+    useState("");
 
   const passwordStrength =
     getPasswordStrength(password);
@@ -66,17 +96,26 @@ function Register() {
     setError("");
     setSuccess("");
 
-    const trimmedUsername = username.trim();
-    const trimmedEmail = email.trim();
-    const trimmedPhone = phone.trim();
+    const trimmedUsername =
+      username.trim();
+
+    const trimmedEmail =
+      email.trim();
+
+    const trimmedPhone =
+      phone.trim();
 
     if (!trimmedUsername) {
-      setError("Please enter a username.");
+      setError(
+        "Please enter a username."
+      );
       return;
     }
 
     if (!trimmedEmail) {
-      setError("Please enter your email address.");
+      setError(
+        "Please enter your email address."
+      );
       return;
     }
 
@@ -95,12 +134,16 @@ function Register() {
     }
 
     if (!confirmPassword) {
-      setError("Please confirm your password.");
+      setError(
+        "Please confirm your password."
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(
+        "Passwords do not match."
+      );
       return;
     }
 
@@ -128,29 +171,39 @@ function Register() {
       );
 
       if (error.response?.data) {
-        const data = error.response.data;
+        const data =
+          error.response.data;
 
-        const messages = Object.entries(data)
-          .map(([field, value]) => {
-            if (Array.isArray(value)) {
-              return `${field}: ${value.join(", ")}`;
-            }
+        const messages =
+          Object.entries(data)
+            .map(
+              ([field, value]) => {
+                if (
+                  Array.isArray(value)
+                ) {
+                  return `${field}: ${value.join(
+                    ", "
+                  )}`;
+                }
 
-            if (
-              value &&
-              typeof value === "object"
-            ) {
-              return `${field}: ${Object.values(
-                value
-              ).join(", ")}`;
-            }
+                if (
+                  value &&
+                  typeof value ===
+                    "object"
+                ) {
+                  return `${field}: ${Object.values(
+                    value
+                  ).join(", ")}`;
+                }
 
-            return `${field}: ${value}`;
-          })
-          .join(" | ");
+                return `${field}: ${value}`;
+              }
+            )
+            .join(" | ");
 
         setError(
-          messages || "Registration failed."
+          messages ||
+            "Registration failed."
         );
       } else {
         setError(
@@ -166,7 +219,9 @@ function Register() {
     <main className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <h1>Create Account</h1>
+          <h1>
+            Create Account
+          </h1>
 
           <p>
             Join E-Shop today
@@ -177,6 +232,7 @@ function Register() {
           <div
             className="auth-error"
             role="alert"
+            aria-live="assertive"
           >
             {error}
           </div>
@@ -186,12 +242,15 @@ function Register() {
           <div
             className="auth-success"
             role="status"
+            aria-live="polite"
           >
             {success}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+        >
           <div className="form-group">
             <label htmlFor="username">
               Username
@@ -203,7 +262,9 @@ function Register() {
               placeholder="Enter username"
               value={username}
               onChange={(event) =>
-                setUsername(event.target.value)
+                setUsername(
+                  event.target.value
+                )
               }
               autoComplete="username"
               required
@@ -222,7 +283,9 @@ function Register() {
               placeholder="Enter your email"
               value={email}
               onChange={(event) =>
-                setEmail(event.target.value)
+                setEmail(
+                  event.target.value
+                )
               }
               autoComplete="email"
               required
@@ -241,7 +304,9 @@ function Register() {
               placeholder="Enter phone number"
               value={phone}
               onChange={(event) =>
-                setPhone(event.target.value)
+                setPhone(
+                  event.target.value
+                )
               }
               autoComplete="tel"
               disabled={loading}
@@ -253,11 +318,7 @@ function Register() {
               Password
             </label>
 
-            <div
-              style={{
-                position: "relative",
-              }}
-            >
+            <div className="password-input-wrapper">
               <input
                 id="register-password"
                 type={
@@ -268,24 +329,25 @@ function Register() {
                 placeholder="Enter password"
                 value={password}
                 onChange={(event) =>
-                  setPassword(event.target.value)
+                  setPassword(
+                    event.target.value
+                  )
                 }
                 autoComplete="new-password"
                 required
                 disabled={loading}
                 minLength={8}
-                style={{
-                  width: "100%",
-                  paddingRight: "48px",
-                }}
+                className="password-input"
                 aria-describedby="password-strength"
               />
 
               <button
                 type="button"
+                className="password-toggle"
                 onClick={() =>
                   setShowPassword(
-                    (previous) => !previous
+                    (previous) =>
+                      !previous
                   )
                 }
                 disabled={loading}
@@ -299,21 +361,6 @@ function Register() {
                     ? "Hide password"
                     : "Show password"
                 }
-                style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform:
-                    "translateY(-50%)",
-                  border: "none",
-                  background: "transparent",
-                  cursor: loading
-                    ? "not-allowed"
-                    : "pointer",
-                  padding: "4px",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                }}
               >
                 {showPassword
                   ? "🙈"
@@ -324,55 +371,43 @@ function Register() {
             {password && (
               <div
                 id="password-strength"
-                style={{
-                  marginTop: "8px",
-                  fontSize: "13px",
-                }}
+                className="password-strength"
               >
                 <span>
                   Password strength:{" "}
                   <strong>
-                    {passwordStrength.label}
+                    {
+                      passwordStrength.label
+                    }
                   </strong>
                 </span>
 
                 <div
-                  style={{
-                    display: "flex",
-                    gap: "4px",
-                    marginTop: "6px",
-                  }}
+                  className="password-strength-bars"
                   aria-hidden="true"
                 >
                   {[1, 2, 3, 4, 5].map(
                     (level) => (
                       <span
                         key={level}
-                        style={{
-                          height: "4px",
-                          flex: 1,
-                          background:
-                            level <=
-                            passwordStrength.score
-                              ? "currentColor"
-                              : "#ddd",
-                          borderRadius:
-                            "4px",
-                        }}
+                        className={
+                          level <=
+                          passwordStrength.score
+                            ? "password-strength-bar password-strength-bar-active"
+                            : "password-strength-bar"
+                        }
                       />
                     )
                   )}
                 </div>
 
-                <span
-                  style={{
-                    display: "block",
-                    marginTop: "6px",
-                  }}
-                >
-                  Use 8+ characters with a mix
-                  of uppercase, lowercase,
-                  numbers, and symbols.
+                <span className="password-help-text">
+                  Use 8+ characters
+                  with a mix of
+                  uppercase,
+                  lowercase,
+                  numbers, and
+                  symbols.
                 </span>
               </div>
             )}
@@ -383,11 +418,7 @@ function Register() {
               Confirm Password
             </label>
 
-            <div
-              style={{
-                position: "relative",
-              }}
-            >
+            <div className="password-input-wrapper">
               <input
                 id="confirm-password"
                 type={
@@ -406,18 +437,17 @@ function Register() {
                 required
                 disabled={loading}
                 minLength={8}
-                style={{
-                  width: "100%",
-                  paddingRight: "48px",
-                }}
+                className="password-input"
                 aria-describedby="password-match"
               />
 
               <button
                 type="button"
+                className="password-toggle"
                 onClick={() =>
                   setShowConfirmPassword(
-                    (previous) => !previous
+                    (previous) =>
+                      !previous
                   )
                 }
                 disabled={loading}
@@ -431,21 +461,6 @@ function Register() {
                     ? "Hide password"
                     : "Show password"
                 }
-                style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform:
-                    "translateY(-50%)",
-                  border: "none",
-                  background: "transparent",
-                  cursor: loading
-                    ? "not-allowed"
-                    : "pointer",
-                  padding: "4px",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                }}
               >
                 {showConfirmPassword
                   ? "🙈"
@@ -456,11 +471,11 @@ function Register() {
             {confirmPassword && (
               <span
                 id="password-match"
-                style={{
-                  display: "block",
-                  marginTop: "6px",
-                  fontSize: "13px",
-                }}
+                className={
+                  passwordsMatch
+                    ? "password-match password-match-success"
+                    : "password-match password-match-error"
+                }
               >
                 {passwordsMatch
                   ? "✓ Passwords match."
@@ -483,6 +498,7 @@ function Register() {
         <div className="auth-footer">
           <p>
             Already have an account?{" "}
+
             <Link to="/login">
               Login
             </Link>

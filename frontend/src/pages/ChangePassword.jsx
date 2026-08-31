@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
+
 import api from "../services/api";
 
 function getPasswordStrength(password) {
@@ -12,11 +16,25 @@ function getPasswordStrength(password) {
 
   let score = 0;
 
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/[0-9]/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  if (password.length >= 8) {
+    score += 1;
+  }
+
+  if (/[A-Z]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[a-z]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[0-9]/.test(password)) {
+    score += 1;
+  }
+
+  if (/[^A-Za-z0-9]/.test(password)) {
+    score += 1;
+  }
 
   const labels = {
     1: "Very Weak",
@@ -83,6 +101,7 @@ function ChangePassword() {
       setError(
         "Please fill in all password fields."
       );
+
       return;
     }
 
@@ -90,6 +109,7 @@ function ChangePassword() {
       setError(
         "New password must be at least 8 characters long."
       );
+
       return;
     }
 
@@ -97,6 +117,7 @@ function ChangePassword() {
       setError(
         "Please choose a stronger password. Use uppercase, lowercase, numbers, or special characters."
       );
+
       return;
     }
 
@@ -104,6 +125,7 @@ function ChangePassword() {
       setError(
         "New password and confirm password do not match."
       );
+
       return;
     }
 
@@ -111,18 +133,18 @@ function ChangePassword() {
       setError(
         "New password must be different from your current password."
       );
+
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
 
+    try {
       await api.post(
         "auth/change-password/",
         {
           current_password:
             currentPassword,
-
           new_password:
             newPassword,
         }
@@ -174,8 +196,8 @@ function ChangePassword() {
           </h1>
 
           <p>
-            Update your password to keep your
-            account secure.
+            Update your password to keep
+            your account secure.
           </p>
         </div>
 
@@ -196,23 +218,21 @@ function ChangePassword() {
 
             {error && (
               <div
-                className="products-empty"
+                className="settings-message settings-message-error"
                 role="alert"
+                aria-live="assertive"
               >
-                <p>
-                  {error}
-                </p>
+                {error}
               </div>
             )}
 
             {success && (
               <div
-                className="products-empty"
+                className="settings-message settings-message-success"
                 role="status"
+                aria-live="polite"
               >
-                <p>
-                  {success}
-                </p>
+                {success}
               </div>
             )}
 
@@ -231,12 +251,7 @@ function ChangePassword() {
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                  }}
-                >
+                <div className="password-input-wrapper">
                   <input
                     type={
                       showCurrentPassword
@@ -252,15 +267,13 @@ function ChangePassword() {
                     autoComplete="current-password"
                     disabled={loading}
                     required
-                    style={{
-                      width: "100%",
-                      paddingRight: "48px",
-                    }}
+                    className="password-input"
                     aria-label="Current Password"
                   />
 
                   <button
                     type="button"
+                    className="password-toggle"
                     onClick={() =>
                       setShowCurrentPassword(
                         (previous) =>
@@ -278,22 +291,6 @@ function ChangePassword() {
                         ? "Hide password"
                         : "Show password"
                     }
-                    style={{
-                      position: "absolute",
-                      right: "12px",
-                      top: "50%",
-                      transform:
-                        "translateY(-50%)",
-                      border: "none",
-                      background:
-                        "transparent",
-                      cursor: loading
-                        ? "not-allowed"
-                        : "pointer",
-                      padding: "4px",
-                      fontSize: "18px",
-                      lineHeight: 1,
-                    }}
                   >
                     {showCurrentPassword
                       ? "🙈"
@@ -313,12 +310,7 @@ function ChangePassword() {
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                  }}
-                >
+                <div className="password-input-wrapper">
                   <input
                     type={
                       showNewPassword
@@ -335,16 +327,14 @@ function ChangePassword() {
                     disabled={loading}
                     required
                     minLength={8}
-                    style={{
-                      width: "100%",
-                      paddingRight: "48px",
-                    }}
+                    className="password-input"
                     aria-label="New Password"
                     aria-describedby="change-password-strength"
                   />
 
                   <button
                     type="button"
+                    className="password-toggle"
                     onClick={() =>
                       setShowNewPassword(
                         (previous) =>
@@ -362,22 +352,6 @@ function ChangePassword() {
                         ? "Hide password"
                         : "Show password"
                     }
-                    style={{
-                      position: "absolute",
-                      right: "12px",
-                      top: "50%",
-                      transform:
-                        "translateY(-50%)",
-                      border: "none",
-                      background:
-                        "transparent",
-                      cursor: loading
-                        ? "not-allowed"
-                        : "pointer",
-                      padding: "4px",
-                      fontSize: "18px",
-                      lineHeight: 1,
-                    }}
                   >
                     {showNewPassword
                       ? "🙈"
@@ -388,42 +362,31 @@ function ChangePassword() {
                 {newPassword && (
                   <div
                     id="change-password-strength"
-                    style={{
-                      width: "100%",
-                      marginTop: "8px",
-                      fontSize: "13px",
-                    }}
+                    className="password-strength"
                   >
                     <span>
                       Password strength:{" "}
                       <strong>
-                        {passwordStrength.label}
+                        {
+                          passwordStrength.label
+                        }
                       </strong>
                     </span>
 
                     <div
-                      style={{
-                        display: "flex",
-                        gap: "4px",
-                        marginTop: "6px",
-                      }}
+                      className="password-strength-bars"
                       aria-hidden="true"
                     >
                       {[1, 2, 3, 4, 5].map(
                         (level) => (
                           <span
                             key={level}
-                            style={{
-                              height: "4px",
-                              flex: 1,
-                              background:
-                                level <=
-                                passwordStrength.score
-                                  ? "currentColor"
-                                  : "#ddd",
-                              borderRadius:
-                                "4px",
-                            }}
+                            className={
+                              level <=
+                              passwordStrength.score
+                                ? "password-strength-bar password-strength-bar-active"
+                                : "password-strength-bar"
+                            }
                           />
                         )
                       )}
@@ -443,12 +406,7 @@ function ChangePassword() {
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                  }}
-                >
+                <div className="password-input-wrapper">
                   <input
                     type={
                       showConfirmPassword
@@ -465,16 +423,14 @@ function ChangePassword() {
                     disabled={loading}
                     required
                     minLength={8}
-                    style={{
-                      width: "100%",
-                      paddingRight: "48px",
-                    }}
+                    className="password-input"
                     aria-label="Confirm New Password"
                     aria-describedby="confirm-password-status"
                   />
 
                   <button
                     type="button"
+                    className="password-toggle"
                     onClick={() =>
                       setShowConfirmPassword(
                         (previous) =>
@@ -492,22 +448,6 @@ function ChangePassword() {
                         ? "Hide password"
                         : "Show password"
                     }
-                    style={{
-                      position: "absolute",
-                      right: "12px",
-                      top: "50%",
-                      transform:
-                        "translateY(-50%)",
-                      border: "none",
-                      background:
-                        "transparent",
-                      cursor: loading
-                        ? "not-allowed"
-                        : "pointer",
-                      padding: "4px",
-                      fontSize: "18px",
-                      lineHeight: 1,
-                    }}
                   >
                     {showConfirmPassword
                       ? "🙈"
@@ -518,11 +458,11 @@ function ChangePassword() {
                 {confirmPassword && (
                   <span
                     id="confirm-password-status"
-                    style={{
-                      width: "100%",
-                      marginTop: "6px",
-                      fontSize: "13px",
-                    }}
+                    className={
+                      passwordsMatch
+                        ? "password-match password-match-success"
+                        : "password-match password-match-error"
+                    }
                   >
                     {passwordsMatch
                       ? "✓ Passwords match."

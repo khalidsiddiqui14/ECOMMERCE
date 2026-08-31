@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -13,52 +17,17 @@ function Wishlist() {
     useState(null);
   const [error, setError] = useState("");
 
-  const loadWishlist = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  // Load wishlist
+  const loadWishlist = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
 
-    try {
-      const data = await getWishlist();
-
-      const items = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data?.items)
-            ? data.items
-            : [];
-
-      setWishlist(items);
-    } catch (error) {
-      console.error(
-        "WISHLIST ERROR:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Wishlist load nahi ho paayi."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchWishlist = async () => {
-      setLoading(true);
       setError("");
 
       try {
         const data = await getWishlist();
-
-        if (cancelled) {
-          return;
-        }
 
         const items = Array.isArray(data)
           ? data
@@ -75,28 +44,26 @@ function Wishlist() {
           error
         );
 
-        if (!cancelled) {
-          setError(
-            error.response?.data?.detail ||
-              error.response?.data?.message ||
-              error.message ||
-              "Wishlist load nahi ho paayi."
-          );
-        }
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Wishlist load nahi ho paayi."
+        );
       } finally {
-        if (!cancelled) {
+        if (showLoading) {
           setLoading(false);
         }
       }
-    };
+    },
+    []
+  );
 
-    fetchWishlist();
+  useEffect(() => {
+    loadWishlist();
+  }, [loadWishlist]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // Remove wishlist item
   const handleRemove = async (itemId) => {
     if (
       !itemId ||
@@ -159,7 +126,9 @@ function Wishlist() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={loadWishlist}
+            onClick={() =>
+              loadWishlist()
+            }
           >
             Try Again
           </button>
@@ -173,9 +142,7 @@ function Wishlist() {
       <div className="wishlist-container">
         <div className="wishlist-header">
           <div>
-            <h1>
-              My Wishlist
-            </h1>
+            <h1>My Wishlist</h1>
 
             <p>
               {wishlist.length} saved product
@@ -197,6 +164,7 @@ function Wishlist() {
           <div
             className="auth-error"
             role="alert"
+            aria-live="assertive"
           >
             {error}
           </div>
@@ -241,10 +209,9 @@ function Wishlist() {
                 product.name ||
                 `Product #${productId}`;
 
-              const productPrice =
-                Number(
-                  product.price || 0
-                );
+              const productPrice = Number(
+                product.price || 0
+              );
 
               const image =
                 Array.isArray(

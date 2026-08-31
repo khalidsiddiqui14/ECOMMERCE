@@ -109,53 +109,6 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
-.navbar {
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-}
-
-.navbar-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 24px;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  text-decoration: none;
-}
-
-.nav-links {
-  display: flex;
-  gap: 24px;
-}
-
-.nav-links a,
-.nav-actions a {
-  color: #374151;
-  text-decoration: none;
-  font-size: 15px;
-}
-
-.nav-links a:hover,
-.nav-actions a:hover {
-  color: #2563eb;
-}
-
-.nav-actions {
-  display: flex;
-  gap: 16px;
-}
-
 .home {
   min-height: 100vh;
 }
@@ -4577,9 +4530,7 @@ code {
     grid-template-columns: 1fr;
   }
 }
-/* =========================================================
-   E-SHOP HOMEPAGE - WIDE COMPACT DESIGN
-   ========================================================= */
+/* ========================================================= E-SHOP HOMEPAGE - WIDE COMPACT DESIGN ========================================================= */
 
 .home {
   --home-dark: #101014;
@@ -5418,9 +5369,7 @@ code {
   font-size: 12px;
 }
 
-/* =========================================================
-   RESPONSIVE
-   ========================================================= */
+/* ========================================================= RESPONSIVE ========================================================= */
 
 @media (max-width: 1100px) {
   .home-container {
@@ -5602,7 +5551,6 @@ code {
     rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 }
 
-
 /* Dark Theme */
 
 :root[data-theme="dark"] {
@@ -5622,7 +5570,6 @@ code {
     rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 }
 
-
 /* Dark Theme - Main Application */
 
 :root[data-theme="dark"] body {
@@ -5630,14 +5577,12 @@ code {
   color: var(--text);
 }
 
-
 /* Light Theme - Main Application */
 
 :root[data-theme="light"] body {
   background: var(--bg);
   color: var(--text);
 }
-
 
 /* Theme transition */
 
@@ -5647,4 +5592,175 @@ body,
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
+}
+/* Registration password */
+
+.password-strength {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.password-strength-bars {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.strength-bar {
+  height: 4px;
+  flex: 1;
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.strength-bar-active {
+  background: var(--text-h);
+}
+
+.password-strength-help {
+  display: block;
+  margin-top: 6px;
+}
+
+.password-match {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.password-match-success {
+  color: var(--text-h);
+}
+
+.password-match-error {
+  color: #b42318;
+}
+/* Product image fallback */
+
+.shop-product-image {
+  position: relative;
+}
+
+.image-fallback-icon {
+  display: none;
+
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  min-height: 220px;
+
+  font-size: 42px;
+}
+
+.shop-product-image.image-fallback img {
+  display: none;
+}
+
+.shop-product-image.image-fallback
+  .image-fallback-icon {
+  display: flex;
+}
+.checkout-link-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Change Password */
+
+.settings-message {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.settings-message-error {
+  color: var(--text-h);
+}
+
+.settings-message-success {
+  color: var(--text-h);
+}
+
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-h);
+  font-size: 18px;
+  line-height: 1;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.password-strength {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.password-strength-bars {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.password-strength-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--border);
+}
+
+.password-strength-bar-active {
+  background: var(--text-h);
+}
+
+.password-match {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.password-match-success {
+  color: var(--text-h);
+}
+
+.password-match-error {
+  color: var(--text-h);
+}
+.password-help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.75;
 }

@@ -3,8 +3,7 @@ import axios from "axios";
 // API Client
 const api = axios.create({
   baseURL:
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://127.0.0.1:8000/api/",
+    "https://ecommerce-2-6amy.onrender.com/api/",
   timeout: 15000,
   headers: {
     Accept: "application/json",

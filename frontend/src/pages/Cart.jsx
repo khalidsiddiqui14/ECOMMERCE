@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
 
 import {
   getCart,
@@ -20,30 +27,39 @@ function Cart() {
   const [removingItemId, setRemovingItemId] =
     useState(null);
 
-  const loadCart = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  // Load cart
+  const loadCart = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+      }
 
-    try {
-      const data = await getCart();
+      setError("");
 
-      setCart(data);
-    } catch (error) {
-      console.error(
-        "CART ERROR:",
-        error
-      );
+      try {
+        const data = await getCart();
 
-      setError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          "Cart load nahi ho paaya."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setCart(data);
+      } catch (error) {
+        console.error(
+          "CART ERROR:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.message ||
+            "Cart load nahi ho paaya."
+        );
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -86,11 +102,14 @@ function Cart() {
     };
   }, []);
 
+  // Update quantity
   const updateQuantity = async (
     itemId,
     newQuantity
   ) => {
-    const quantity = Number(newQuantity);
+    const quantity = Number(
+      newQuantity
+    );
 
     if (
       !Number.isInteger(quantity) ||
@@ -125,6 +144,7 @@ function Cart() {
     }
   };
 
+  // Handle quantity input
   const handleQuantityChange = async (
     itemId,
     value
@@ -135,6 +155,7 @@ function Cart() {
     );
   };
 
+  // Decrease quantity
   const handleDecrease = async (
     itemId,
     quantity
@@ -149,6 +170,7 @@ function Cart() {
     );
   };
 
+  // Increase quantity
   const handleIncrease = async (
     itemId,
     quantity
@@ -159,6 +181,7 @@ function Cart() {
     );
   };
 
+  // Remove cart item
   const handleRemove = async (itemId) => {
     if (removingItemId === itemId) {
       return;
@@ -170,7 +193,7 @@ function Cart() {
     try {
       await removeCartItem(itemId);
 
-      await loadCart();
+      await loadCart(false);
     } catch (error) {
       console.error(
         "CART REMOVE ERROR:",
@@ -205,16 +228,16 @@ function Cart() {
     return (
       <main className="cart-page">
         <div className="products-empty">
-          <h2>
-            Unable to Load Cart
-          </h2>
+          <h2>Unable to Load Cart</h2>
 
           <p>{error}</p>
 
           <button
             type="button"
             className="btn btn-primary"
-            onClick={loadCart}
+            onClick={() =>
+              loadCart()
+            }
           >
             Try Again
           </button>
@@ -260,14 +283,16 @@ function Cart() {
     0
   );
 
+  const isCartBusy =
+    updatingItemId !== null ||
+    removingItemId !== null;
+
   return (
     <main className="cart-page">
       <div className="cart-container">
         <div className="cart-header">
           <div>
-            <h1>
-              Shopping Cart
-            </h1>
+            <h1>Shopping Cart</h1>
 
             <p>
               {totalItems} item
@@ -289,6 +314,7 @@ function Cart() {
           <div
             className="auth-error"
             role="alert"
+            aria-live="assertive"
           >
             {error}
           </div>
@@ -352,6 +378,11 @@ function Cart() {
                   removingItemId ===
                   item.id;
 
+                const productName =
+                  item.product_name ||
+                  product.name ||
+                  `Product #${item.product}`;
+
                 return (
                   <article
                     className="cart-item"
@@ -362,8 +393,7 @@ function Cart() {
                         <img
                           src={product.image}
                           alt={
-                            product.name ||
-                            "Product"
+                            productName
                           }
                           loading="lazy"
                           onError={(
@@ -385,9 +415,7 @@ function Cart() {
 
                     <div className="cart-item-info">
                       <h3>
-                        {item.product_name ||
-                          product.name ||
-                          `Product #${item.product}`}
+                        {productName}
                       </h3>
 
                       <p>
@@ -418,11 +446,7 @@ function Cart() {
                                 quantity
                               )
                             }
-                            aria-label={`Decrease quantity of ${
-                              item.product_name ||
-                              product.name ||
-                              "product"
-                            }`}
+                            aria-label={`Decrease quantity of ${productName}`}
                           >
                             −
                           </button>
@@ -444,11 +468,7 @@ function Cart() {
                                 event.target.value
                               )
                             }
-                            aria-label={`Quantity for ${
-                              item.product_name ||
-                              product.name ||
-                              "product"
-                            }`}
+                            aria-label={`Quantity for ${productName}`}
                           />
 
                           <button
@@ -463,11 +483,7 @@ function Cart() {
                                 quantity
                               )
                             }
-                            aria-label={`Increase quantity of ${
-                              item.product_name ||
-                              product.name ||
-                              "product"
-                            }`}
+                            aria-label={`Increase quantity of ${productName}`}
                           >
                             +
                           </button>
@@ -513,9 +529,7 @@ function Cart() {
             </section>
 
             <aside className="cart-summary">
-              <h2>
-                Order Summary
-              </h2>
+              <h2>Order Summary</h2>
 
               <div className="cart-summary-row">
                 <span>Items</span>
@@ -539,15 +553,11 @@ function Cart() {
               <div className="cart-summary-row">
                 <span>Shipping</span>
 
-                <strong>
-                  Free
-                </strong>
+                <strong>Free</strong>
               </div>
 
               <div className="cart-summary-total">
-                <span>
-                  Total
-                </span>
+                <span>Total</span>
 
                 <strong>
                   ₹
@@ -564,8 +574,7 @@ function Cart() {
                   navigate("/checkout")
                 }
                 disabled={
-                  updatingItemId !== null ||
-                  removingItemId !== null ||
+                  isCartBusy ||
                   items.length === 0
                 }
               >

@@ -3,14 +3,18 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 function ProtectedRoute() {
   const location = useLocation();
 
-  const token = localStorage.getItem("access_token");
+  const accessToken = localStorage.getItem(
+    "access_token"
+  );
 
-  if (!token) {
+  if (!accessToken) {
     return (
       <Navigate
         to="/login"
         replace
-        state={{ from: location }}
+        state={{
+          from: location,
+        }}
       />
     );
   }

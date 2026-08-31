@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import {
+  Link,
+  useParams,
+} from "react-router-dom";
 
 import { getProduct } from "../services/productService";
 import { addToCart } from "../services/cartService";
@@ -24,17 +27,16 @@ function ProductDetail() {
   const [imageError, setImageError] =
     useState(false);
 
+  // Load product
   useEffect(() => {
     let cancelled = false;
 
     const loadProduct = async () => {
-      if (!cancelled) {
-        setLoading(true);
-        setError("");
-        setProduct(null);
-        setImageError(false);
-        setQuantity(1);
-      }
+      setLoading(true);
+      setError("");
+      setProduct(null);
+      setImageError(false);
+      setQuantity(1);
 
       try {
         const data = await getProduct(id);
@@ -69,14 +71,10 @@ function ProductDetail() {
       }
     };
 
-    const timer = setTimeout(
-      loadProduct,
-      0
-    );
+    loadProduct();
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
   }, [id]);
 
@@ -86,25 +84,18 @@ function ProductDetail() {
 
   const hasStock = stock > 0;
 
-  const handleQuantityChange = (
-    event
-  ) => {
-    const value =
-      event.target.value;
+  // Handle quantity input
+  const handleQuantityChange = (event) => {
+    const value = event.target.value;
 
     if (value === "") {
       setQuantity("");
       return;
     }
 
-    const numericValue =
-      Number(value);
+    const numericValue = Number(value);
 
-    if (
-      !Number.isInteger(
-        numericValue
-      )
-    ) {
+    if (!Number.isInteger(numericValue)) {
       return;
     }
 
@@ -121,6 +112,7 @@ function ProductDetail() {
     setQuantity(numericValue);
   };
 
+  // Decrease quantity
   const handleDecrease = () => {
     setQuantity((current) => {
       const currentValue =
@@ -133,6 +125,7 @@ function ProductDetail() {
     });
   };
 
+  // Increase quantity
   const handleIncrease = () => {
     setQuantity((current) => {
       const currentValue =
@@ -145,6 +138,7 @@ function ProductDetail() {
     });
   };
 
+  // Add product to cart
   const handleAddToCart = async () => {
     if (
       !product ||
@@ -167,7 +161,6 @@ function ProductDetail() {
       setError(
         "Please select a valid quantity."
       );
-
       return;
     }
 
@@ -204,6 +197,7 @@ function ProductDetail() {
     }
   };
 
+  // Add product to wishlist
   const handleAddToWishlist =
     async () => {
       if (
@@ -259,9 +253,7 @@ function ProductDetail() {
     return (
       <main className="product-detail-page">
         <div className="products-empty">
-          <h2>
-            Product Not Found
-          </h2>
+          <h2>Product Not Found</h2>
 
           <p>{error}</p>
 
@@ -293,9 +285,7 @@ function ProductDetail() {
   }
 
   const productImages =
-    Array.isArray(
-      product.images
-    )
+    Array.isArray(product.images)
       ? product.images
       : [];
 
@@ -317,8 +307,7 @@ function ProductDetail() {
     <main className="product-detail-page">
       <div className="product-detail-container">
         <div className="product-detail-image">
-          {primaryImage &&
-          !imageError ? (
+          {primaryImage && !imageError ? (
             <img
               src={primaryImage}
               alt={
@@ -345,8 +334,7 @@ function ProductDetail() {
           </span>
 
           <h1>
-            {product.name ||
-              "Product"}
+            {product.name || "Product"}
           </h1>
 
           <p className="detail-price">
@@ -381,6 +369,7 @@ function ProductDetail() {
             <div
               className="auth-error"
               role="alert"
+              aria-live="assertive"
             >
               {error}
             </div>
@@ -420,9 +409,7 @@ function ProductDetail() {
                   }
                   disabled={
                     adding ||
-                    Number(
-                      quantity
-                    ) <= 1
+                    Number(quantity) <= 1
                   }
                   aria-label="Decrease quantity"
                 >
@@ -450,9 +437,8 @@ function ProductDetail() {
                   }
                   disabled={
                     adding ||
-                    Number(
-                      quantity
-                    ) >= stock
+                    Number(quantity) >=
+                      stock
                   }
                   aria-label="Increase quantity"
                 >
@@ -461,8 +447,7 @@ function ProductDetail() {
               </div>
 
               <span id="quantity-help">
-                Maximum available:{" "}
-                {stock}
+                Maximum available: {stock}
               </span>
             </div>
           )}
