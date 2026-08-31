@@ -3785,3 +3785,128 @@ textarea:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+/* =========================================================
+   FINAL NAVBAR BUTTON FIX
+   ========================================================= */
+
+.navbar {
+  width: 100%;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.navbar-container {
+  width: min(1200px, calc(100% - 32px));
+  min-height: 70px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-links {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px !important;
+}
+
+.navbar-link {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 40px;
+  padding: 9px 14px !important;
+
+  border: 1px solid var(--border) !important;
+  border-radius: 9px !important;
+
+  background: var(--bg) !important;
+  color: var(--text) !important;
+
+  text-decoration: none !important;
+
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+
+  white-space: nowrap;
+
+  box-sizing: border-box;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.navbar-link:hover {
+  background: var(--social-bg) !important;
+  color: var(--text-h) !important;
+  border-color: var(--text-h) !important;
+  transform: translateY(-1px);
+}
+
+.navbar-link-active {
+  background: var(--text-h) !important;
+  color: var(--bg) !important;
+  border-color: var(--text-h) !important;
+}
+
+/* Right side */
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mobile */
+
+@media (max-width: 800px) {
+  .navbar-container {
+    width: calc(100% - 20px);
+    min-height: 62px;
+  }
+
+  .navbar-menu-button {
+    display: inline-flex !important;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 62px;
+    left: 10px;
+    right: 10px;
+
+    display: none !important;
+
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+
+    gap: 6px !important;
+
+    padding: 10px;
+
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+
+    box-shadow: var(--shadow);
+  }
+
+  .nav-links.nav-links-open {
+    display: flex !important;
+  }
+
+  .navbar-link {
+    width: 100%;
+    justify-content: flex-start;
+    min-height: 44px;
+    padding: 11px 13px !important;
+  }
+}
