@@ -3,11 +3,6 @@
    Total: Original 2000+ lines preserved + fixed + Flipkart touch
    ================================================================= */
 
-/* ── Tailwind ── */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* ── Root Variables - Light ── */
 :root {
   --flipkart-blue: #2874f0;
