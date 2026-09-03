@@ -20,3 +20,9 @@ export const getCategories = async () => { const res = await api.get("categories
 export const getBrands = async () => { try { const res = await api.get("brands/"); return res.data; } catch { return []; } };
 export const getDealsOfTheDay = async () => { try { const res = await api.get("products/", { params: { has_discount: true, ordering: "-discount", page_size: 8 } }); return res.data; } catch { return { results: [] }; } };
 export const getProductsByPriceRange = async (min, max, params = {}) => getProducts({ min_price: min, max_price: max, ...params });
+
+export const getCart = async () => { const res = await api.get("cart/"); return res.data; };
+export const getCartCount = async () => { try { const cart = await getCart(); const items = Array.isArray(cart) ? cart : cart?.items || []; return items.reduce((total, item) => total + Number(item.quantity || 0), 0); } catch { return 0; } };
+export const addToCart = async (productId, quantity = 1) => { const res = await api.post("cart/", { product: toId(productId), quantity: Number(quantity) || 1 }); return res.data; };
+export const updateCartItem = async (itemId, quantity) => { const res = await api.patch(`cart/${toId(itemId)}/`, { quantity: Number(quantity) }); return res.data; };
+export const removeCartItem = async (itemId) => { const res = await api.delete(`cart/${toId(itemId)}/`); return res.data; };
