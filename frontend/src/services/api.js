@@ -21,7 +21,6 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if (config.data instanceof FormData) delete config.headers["Content-Type"];
   else if (!config.headers["Content-Type"]) config.headers["Content-Type"] = "application/json";
-  config.headers["X-Request-ID"] = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return config;
 });
 
