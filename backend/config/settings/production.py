@@ -18,7 +18,7 @@ ALLOWED_HOSTS = [
 
 ## Production frontend origins
 CORS_ALLOWED_ORIGINS = [
-    "https://ecommerce-frontend-bc57.onrender.com",
+    "https://frontend-gsdp.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -27,7 +27,7 @@ CORS_ALLOWED_ORIGINS = [
 # Trusted frontend origins for CSRF protection
 # Trusted frontend origins for CSRF protection
 CSRF_TRUSTED_ORIGINS = [
-    "https://ecommerce-frontend-bc57.onrender.com",
+    "https://frontend-gsdp.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
