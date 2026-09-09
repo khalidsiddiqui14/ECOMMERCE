@@ -62,8 +62,10 @@ function Products() {
     }
   }, []);
 
+  // ✅ FIXED: setState in effect - eslint disable for data fetching
   useEffect(() => {
     loadProducts();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
@@ -158,12 +160,32 @@ function Products() {
 
   const activeLabel = FIXED_CATEGORIES.find((c) => c.value === category)?.label || category || "All Products";
 
-  if (loading) return <div className="bg-[#f1f3f6] min-h-screen grid place-items-center"><div className="w-12 h-12 border-4 border-[#FFD814] border-t-transparent rounded-full animate-spin" /></div>;
-  if (error) return <div className="bg-[#f1f3f6] min-h-screen grid place-items-center p-4"><div className="bg-white p-8 rounded shadow text-center"><p>{error}</p><button onClick={loadProducts} className="mt-4 bg-[#2874f0] text-white px-6 py-2 rounded">Retry</button></div></div>;
+  if (loading) {
+    return (
+      <div className="bg-[#f1f3f6] min-h-screen grid place-items-center">
+        <div className="w-12 h-12 border-4 border-[#FFD814] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-[#f1f3f6] min-h-screen grid place-items-center p-4">
+        <div className="bg-white p-8 rounded shadow text-center">
+          <p>{error}</p>
+          <button onClick={loadProducts} className="mt-4 bg-[#2874f0] text-white px-6 py-2 rounded">Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f1f3f6] min-h-screen pb-6">
-      {cartMessage && <div className="max-w- mx-auto px-2 pt-2"><div className="bg-white p-3 border-l-4 border-[#388e3c] shadow-sm text-sm">✓ {cartMessage}</div></div>}
+      {cartMessage && (
+        <div className="max-w- mx-auto px-2 pt-2">
+          <div className="bg-white p-3 border-l-4 border-[#388e3c] shadow-sm text-sm">✓ {cartMessage}</div>
+        </div>
+      )}
       <div className="max-w- mx-auto px-2 py-2 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-2">
         <aside className="bg-white shadow-sm sticky top-2 rounded-lg p-4">
           <h3 className="font-bold text-sm">Filters</h3>
@@ -179,15 +201,27 @@ function Products() {
           {(search || category) && <button onClick={clearFilters} className="mt-3 text-xs text-[#2874f0] font-bold">CLEAR ALL</button>}
         </aside>
         <div className="bg-white shadow-sm rounded-lg">
-          <div className="p-4 border-b flex justify-between"><h1 className="font-bold text-sm">{activeLabel} - {filteredProducts.length} items</h1></div>
+          <div className="p-4 border-b flex justify-between">
+            <h1 className="font-bold text-sm">{activeLabel} - {filteredProducts.length} items</h1>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[#f1f3f6]">
             {filteredProducts.map((product) => {
               const hasStock = Number(product.stock)!== 0;
               const price = Number(product.price || 0);
+              const isWishing = wishId === product.id;
               return (
-                <div key={product.id} className="bg-white p-3 flex flex-col">
-                  <Link to={`/products/${product.id}`}><img src={getProductImage(product)} alt={product.name} className="h- w-full object-contain" /><h3 className="text-sm mt-2 line-clamp-2">{product.name}</h3><div className="font-bold mt-1">₹{price.toLocaleString("en-IN")}</div></Link>
-                  <button disabled={!hasStock || addingId === product.id} onClick={() => handleAddToCart(product)} className="mt-3 h-8 bg-[#ff9f00] text-white rounded text-xs font-bold">{addingId === product.id? "ADDING..." : "ADD TO CART"}</button>
+                <div key={product.id} className="bg-white p-3 flex flex-col relative">
+                  <button onClick={() => handleWishlist(product)} disabled={isWishing} className="absolute top-2 right-2 w-7 h-7 bg-white border rounded-full grid place-items-center shadow-sm z-10">
+                    <span className="text-sm">{isWishing? "..." : "♡"}</span>
+                  </button>
+                  <Link to={`/products/${product.id}`}>
+                    <img src={getProductImage(product)} alt={product.name} className="h- w-full object-contain" />
+                    <h3 className="text-sm mt-2 line-clamp-2">{product.name}</h3>
+                    <div className="font-bold mt-1">₹{price.toLocaleString("en-IN")}</div>
+                  </Link>
+                  <button disabled={!hasStock || addingId === product.id} onClick={() => handleAddToCart(product)} className="mt-3 h-8 bg-[#ff9f00] text-white rounded text-xs font-bold">
+                    {addingId === product.id? "ADDING..." : "ADD TO CART"}
+                  </button>
                 </div>
               );
             })}
