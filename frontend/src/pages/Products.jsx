@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getProducts } from "../services/productService";
@@ -62,10 +63,8 @@ function Products() {
     }
   }, []);
 
-  // ✅ FIXED: setState in effect - eslint disable for data fetching
   useEffect(() => {
     loadProducts();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
@@ -190,7 +189,9 @@ function Products() {
         <aside className="bg-white shadow-sm sticky top-2 rounded-lg p-4">
           <h3 className="font-bold text-sm">Filters</h3>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full h-9 mt-3 border px-2 text-sm rounded">
-            {FIXED_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            {FIXED_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
           </select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full h-9 mt-3 border px-2 text-sm rounded">
             <option value="latest">Popularity</option>
@@ -198,7 +199,9 @@ function Products() {
             <option value="price-high">High to Low</option>
           </select>
           <input type="search" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-9 mt-3 border pl-3 text-sm rounded" />
-          {(search || category) && <button onClick={clearFilters} className="mt-3 text-xs text-[#2874f0] font-bold">CLEAR ALL</button>}
+          {(search || category) && (
+            <button onClick={clearFilters} className="mt-3 text-xs text-[#2874f0] font-bold">CLEAR ALL</button>
+          )}
         </aside>
         <div className="bg-white shadow-sm rounded-lg">
           <div className="p-4 border-b flex justify-between">
