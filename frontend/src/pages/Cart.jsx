@@ -1,303 +1,274 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getCart, updateCartItem, removeCartItem } from "../services/cartService";
+import { getCart, updateCartItem, removeCartItem, saveForLater, getSavedForLater, moveToCart, getBuyAgain } from "../services/cartService";
+import { getImageUrl, IMAGE_BASE } from "../services/api";
+
+const getCartImageUrl = (item) => {
+  try {
+    const p = item?.product || {};
+    const imgObj = p.images?.[0] || p.image || p.thumbnail || item?.product_image || item?.image || "";
+    return getImageUrl(imgObj) || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop`;
+  } catch {
+    return `https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop`;
+  }
+};
 
 function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState(null);
+  const [saved, setSaved] = useState([]);
+  const [buyAgain, setBuyAgain] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
   const [removingId, setRemovingId] = useState(null);
+  const [savingId, setSavingId] = useState(null);
 
   const loadCart = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError("");
     try {
-      const data = await getCart();
-      setCart(data);
+      const [cartData, savedData, buyData] = await Promise.allSettled([
+        getCart(),
+        getSavedForLater(),
+        getBuyAgain()
+      ]);
+      if (cartData.status==="fulfilled") setCart(cartData.value);
+      if (savedData.status==="fulfilled") {
+        const s = savedData.value;
+        setSaved(Array.isArray(s)? s : s?.items || s?.results || []);
+      }
+      if (buyData.status==="fulfilled") {
+        const b = buyData.value;
+        const list = Array.isArray(b)? b : b?.products || b?.results || [];
+        setBuyAgain(list.slice(0,8));
+      }
+      try { window.dispatchEvent(new Event("cart-change")); } catch {}
     } catch (err) {
-      console.error("CART ERROR:", err);
-      setError(err.response?.data?.detail || err.response?.data?.message || err.message || "Cart load nahi ho paaya.");
+      setError(err.response?.data?.detail || err.message || "Cart load failed");
     } finally {
       if (showLoading) setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await getCart();
-        if (!cancelled) setCart(data);
-      } catch (err) {
-        if (!cancelled) setError(err.response?.data?.detail || err.message || "Cart load nahi ho paaya.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { loadCart(); }, [loadCart]);
 
   const updateQuantity = async (itemId, newQty) => {
     const q = Number(newQty);
-    if (!Number.isInteger(q) || q < 1) return;
+    if (!Number.isInteger(q) || q<1) return;
     setUpdatingId(itemId);
     setError("");
     try {
       const data = await updateCartItem(itemId, q);
       setCart(data);
+      try { window.dispatchEvent(new Event("cart-change")); } catch {}
     } catch (err) {
-      setError(err.response?.data?.detail || "Quantity update nahi ho paayi.");
+      setError(err.response?.data?.detail || "Quantity update failed");
     } finally {
       setUpdatingId(null);
     }
   };
 
   const handleRemove = async (itemId) => {
-    if (removingId === itemId) return;
+    if (removingId===itemId) return;
     setRemovingId(itemId);
-    setError("");
     try {
       await removeCartItem(itemId);
       await loadCart(false);
     } catch (err) {
-      setError(err.response?.data?.detail || "Item remove nahi ho paya.");
+      setError(err.response?.data?.detail || "Remove failed");
     } finally {
       setRemovingId(null);
     }
   };
 
+  const handleSaveForLater = async (itemId) => {
+    if (savingId===itemId) return;
+    setSavingId(itemId);
+    try {
+      await saveForLater(itemId);
+      await loadCart(false);
+    } catch {
+      setError("Save for later failed");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleMoveToCart = async (savedId) => {
+    setSavingId(savedId);
+    try {
+      await moveToCart(savedId);
+      await loadCart(false);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   if (loading) {
     return (
-      <main className="cart-page">
-        <div className="cart-container">
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            {[1,2,3].map(i=>(
-              <div key={i} style={{height:130,background:'#fff',border:'1px solid #ece8de',borderRadius:16,animation:'pulse 1.5s infinite'}} />
-            ))}
-          </div>
+      <div className="bg-[#EAEDED] min-h-screen p-4">
+        <div className="max-w- mx-auto space-y-3">
+          {[1,2,3].map(i=>(<div key={i} className="h- bg-white shadow-sm animate-pulse rounded- border border-[#d5d9d9]" />))}
         </div>
-      </main>
+      </div>
     );
   }
 
-  if (error && !cart) {
+  if (error &&!cart) {
     return (
-      <main className="cart-page">
-        <div className="cart-container">
-          <div className="wishlist-empty">
-            <div className="wishlist-empty-icon">⚠️</div>
-            <h2>Unable to Load Cart</h2>
-            <p>{error}</p>
-            <button type="button" className="btn btn-primary" onClick={()=>loadCart()}>Try Again</button>
-          </div>
+      <div className="bg-[#EAEDED] min-h-screen grid place-items-center p-4">
+        <div className="bg-white p-8 shadow-sm text-center rounded- border border-[#d5d9d9] max-w- w-full">
+          <div className="text-">🛒</div>
+          <h2 className="font-bold text- mt-2">Unable to Load Cart</h2>
+          <p className="text- text-[#565959] mt-2">{error}</p>
+          <button className="mt-4 bg-[#FFD814] px-6 h-9 rounded- text- font-bold border border-[#FCD200] shadow-sm" onClick={()=>loadCart()}>Try Again</button>
+          <Link to="/products" className="ml-2 inline-flex h-9 px-4 border border-[#d5d9d9] rounded- items-center text- bg-white">Browse Products</Link>
         </div>
-      </main>
+      </div>
     );
   }
 
-  const items = Array.isArray(cart?.items) ? cart.items : [];
+  const items = Array.isArray(cart?.items)? cart.items : cart?.cart_items || [];
   const subtotal = items.reduce((t,it)=>{
     const p = it.product || {};
-    const price = Number(it.price ?? it.product_price ?? p.price ?? 0);
+    const price = Number(it.price?? it.product_price?? it.unit_price?? p.price?? 0);
     return t + price * Number(it.quantity || 0);
   },0);
   const totalItems = items.reduce((t,it)=> t + Number(it.quantity||0),0);
-  const isBusy = updatingId!==null || removingId!==null;
+  const isBusy = updatingId!==null || removingId!==null || savingId!==null;
 
   return (
-    <main className="cart-page" style={{background:'#fafaf7',minHeight:'100vh',padding:'32px 24px'}}>
-      <div className="cart-container" style={{maxWidth:1120,margin:'0 auto'}}>
-        {/* Header */}
-        <div className="cart-header" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:28,flexWrap:'wrap',gap:16}}>
-          <div>
-            <h1 style={{margin:'0 0 8px',fontSize:'clamp(28px,4vw,36px)',fontWeight:900,letterSpacing:'-.03em',color:'#1a1816'}}>
-              Shopping Cart
-              {totalItems>0 && <span style={{marginLeft:12,display:'inline-flex',minWidth:32,height:28,padding:'0 10px',alignItems:'center',justifyContent:'center',background:'#1a1816',color:'#fff',borderRadius:999,fontSize:13,fontWeight:800}}>{totalItems}</span>}
-            </h1>
-            <p style={{margin:0,color:'#8c8881',fontSize:14}}>
-              {totalItems===0 ? "Your cart is waiting" : `${totalItems} item${totalItems===1?'':'s'} • Free delivery on orders above ₹999`}
-            </p>
-          </div>
-          <Link to="/products" style={{minHeight:42,padding:'0 18px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:13,fontWeight:700,color:'#1a1816'}}>
-            Continue Shopping →
-          </Link>
-        </div>
+    <div className="bg-[#EAEDED] min-h-screen p-2 pb-6">
+      <div className="max-w- mx-auto">
+        <h1 className="text- font-medium p-4 bg-white shadow-sm mb-2 rounded- border border-[#d5d9d9] flex flex-wrap items-center gap-2">
+          Shopping Cart {totalItems>0 && <span className="text- text-[#565959] font-normal">({totalItems} {totalItems===1? 'item':'items'})</span>}
+          <span className="text- text-[#067D62] ml-2 px-2 py-0.5 bg-[#f0f2f2] border border-[#d5d9d9] rounded-full">{IMAGE_BASE?.includes("render")? "Render Deploy • Live" : "Local • Dev"}</span>
+          <Link to="/products" className="ml-auto text- text-[#0066c0] hover:underline">Continue shopping</Link>
+        </h1>
 
-        {error && (
-          <div role="alert" style={{padding:'12px 14px',marginBottom:20,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,color:'#991b1b',fontSize:13,fontWeight:600}}>
-            ⚠️ {error}
+        {error && <div className="bg-white p-3 mb-2 border-l- border-[#CC0C39] text- text-[#CC0C39] shadow-sm rounded- flex justify-between">⚠ {error} <button onClick={()=>setError("")} className="text-[#0066c0] font-bold">Dismiss</button></div>}
+
+        {items.length===0? (
+          <div className="bg-white p-12 text-center shadow-sm rounded- border border-[#d5d9d9]">
+            <div className="text- mb-4">🛒</div>
+            <h2 className="text- font-bold">Your Amazon Cart is empty</h2>
+            <p className="text- text-[#565959] mt-2 max-w- mx-auto">Your shopping cart lives to serve. Give it purpose — fill it with groceries, clothing, household supplies, electronics, and more.</p>
+            <div className="flex flex-wrap gap-2 justify-center mt-6">
+              <Link to="/products" className="bg-[#FFD814] px-6 h-9 leading-9 rounded- text- font-bold border border-[#FCD200] shadow-sm">Browse Products</Link>
+              <Link to="/deals" className="bg-white border border-[#d5d9d9] px-6 h-9 leading-9 rounded- text- shadow-sm">Today's Deals</Link>
+              {saved.length>0 && <span className="text- leading-9 text-[#565959]">• {saved.length} saved for later below ↓</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-3 items-start">
+            <div className="bg-white shadow-sm rounded- border border-[#d5d9d9] overflow-hidden">
+              <div className="p-3 text-right text- text-[#565959] hidden md:block border-b border-[#eaeaea]">Price</div>
+              {items.map((item)=>{
+                const product = item.product || {};
+                const price = Number(item.price?? item.product_price?? product.price?? 0);
+                const mrp = Number(product.original_price || product.mrp || price*1.2);
+                const quantity = Number(item.quantity || 0);
+                const name = item.product_name || product.name || `Product #${item.product}`;
+                const image = getCartImageUrl(item);
+                const isUpdating = updatingId===item.id;
+                const isRemoving = removingId===item.id;
+                const isSaving = savingId===item.id;
+
+                return (
+                  <div key={item.id} className={`p-4 flex gap-4 border-b border-[#eaeaea] last:border-0 ${isRemoving||isSaving?'opacity-50 pointer-events-none':''}`}>
+                    <Link to={`/product/${product.id || item.product}`} className="shrink-0">
+                      <img src={image} alt={name} className="w-24 h-24 object-contain bg-[#f7f7f7] border border-[#f0f2f2] rounded-" onError={(e)=>{ e.currentTarget.src=`https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200`; }} />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <Link to={`/product/${product.id || item.product}`} className="text- text-[#0F1111] line-clamp-2 hover:text-[#C45500] leading-">{name}</Link>
+                      <div className="text- text-[#067D62] mt-1">✓ In stock • Eligible for FREE Shipping • <span className="bg-[#067D62] text-white px-1 rounded-">Prime</span></div>
+                      <div className="text- text-[#565959]">Sold by E-Shop • Gift options • Size: Free</div>
+                      <div className="flex items-center gap-3 mt-3 flex-wrap">
+                        <div className="flex items-center border border-[#d5d9d9] rounded- overflow-hidden h-8 shadow-sm bg-white">
+                          <button disabled={isUpdating||isRemoving||quantity<=1} onClick={()=>updateQuantity(item.id,quantity-1)} className="w-8 bg-[#f0f2f2] hover:bg-[#e3e6e6] text- h-full disabled:opacity-40">−</button>
+                          <span className="w-10 text-center text- font-medium border-x border-[#d5d9d9] h-full grid place-items-center">{isUpdating?'...':quantity}</span>
+                          <button disabled={isUpdating||isRemoving} onClick={()=>updateQuantity(item.id,quantity+1)} className="w-8 bg-[#f0f2f2] hover:bg-[#e3e6e6] text- h-full">+</button>
+                        </div>
+                        <button disabled={isUpdating||isRemoving||isSaving} onClick={()=>handleRemove(item.id)} className="text- text-[#0066c0] hover:underline border-l border-[#d5d9d9] pl-3 hover:text-[#C45500]">{isRemoving?'Removing...':'Delete'}</button>
+                        <button disabled={isSaving} onClick={()=>handleSaveForLater(item.id)} className="text- text-[#0066c0] hover:underline border-l border-[#d5d9d9] pl-3 hover:text-[#C45500]">{isSaving?'Saving...':'Save for later'}</button>
+                        <button className="text- text-[#0066c0] hover:underline border-l border-[#d5d9d9] pl-3 hover:text-[#C45500]">Share</button>
+                        <button className="text- text-[#0066c0] hover:underline border-l border-[#d5d9d9] pl-3 hover:text-[#C45500]">Compare</button>
+                      </div>
+                      {mrp>price && <div className="text- mt-2"><span className="bg-[#CC0C39] text-white px-1.5 py-0.5 rounded- font-bold">Limited time deal</span> <span className="text-[#CC0C39] ml-1 font-bold">{Math.round((1-price/mrp)*100)}% off</span> • Ends in 12h</div>}
+                    </div>
+                    <div className="text-right min-w-">
+                      <div className="font-bold text-">₹{price.toLocaleString("en-IN")}.00</div>
+                      {mrp>price && <div className="text- text-[#565959] line-through">M.R.P: ₹{mrp.toLocaleString("en-IN")}</div>}
+                      <div className="text- text-[#565959] mt-1">Inclusive of taxes</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="p-4 text-right text- bg-white border-t border-[#eaeaea]">Subtotal ({totalItems} items): <span className="font-bold">₹{subtotal.toLocaleString("en-IN")}.00</span></div>
+            </div>
+
+            <div className="bg-white p-4 shadow-sm border border-[#d5d9d9] rounded- sticky top-">
+              <div className="text- text-[#067D62] flex gap-1.5 bg-[#f0f8f0] border border-[#d5e8d5] p-2 rounded-"><span>✓</span> <span>Your order is eligible for FREE Delivery. Select this option at checkout. <span className="text-[#0066c0] hover:underline cursor-pointer">Details</span></span></div>
+              <div className="text- mt-3">Subtotal ({totalItems} items): <span className="font-bold">₹{subtotal.toLocaleString("en-IN")}.00</span></div>
+              <div className="flex items-center gap-2 mt-3 text-">
+                <input type="checkbox" defaultChecked className="w-4 h-4 accent-[#e77600]" /> <span>This order contains a gift</span>
+              </div>
+              <button onClick={()=>navigate("/checkout")} disabled={isBusy||items.length===0} className="w-full mt-4 h-10 bg-[#FFD814] hover:bg-[#F7CA00] rounded- text- shadow-sm border border-[#FCD200] disabled:opacity-50 font-medium">
+                Proceed to Buy ({totalItems} {totalItems===1? 'item':'items'})
+              </button>
+              <div className="mt-3 text- text-[#067D62] border border-[#d5d9d9] p-2 rounded- flex gap-2 bg-[#f7fafa]">
+                <span>🔒</span> <span>Secure transaction • EMI available • 10-day replacement • Cash on Delivery • UPI • Cards</span>
+              </div>
+              <div className="mt-3 text- text-[#565959] leading-">By placing your order, you agree to ShopZone's privacy notice and conditions of use.</div>
+              <div className="mt-3 flex gap-2">
+                <Link to="/wishlist" className="flex-1 h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white hover:bg-[#f7fafa]">Wishlist</Link>
+                <Link to="/orders" className="flex-1 h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white hover:bg-[#f7fafa]">Orders</Link>
+              </div>
+            </div>
           </div>
         )}
 
-        {items.length===0 ? (
-          <div className="cart-empty" style={{textAlign:'center',padding:'80px 32px',background:'#fff',border:'1px solid #ece8de',borderRadius:24}}>
-            <div style={{width:80,height:80,margin:'0 auto 16px',display:'grid',placeItems:'center',background:'#fafaf7',border:'1px solid #ece8de',borderRadius:'50%',fontSize:36}}>🛒</div>
-            <h2 style={{margin:'0 0 8px',fontSize:24,fontWeight:900}}>Your cart is empty</h2>
-            <p style={{margin:'0 0 24px',color:'#8c8881'}}>Add some products to your cart and they will appear here.</p>
-            <Link to="/products" style={{display:'inline-flex',minHeight:48,padding:'0 24px',alignItems:'center',background:'#1a1816',color:'#fff',borderRadius:999,fontWeight:800}}>Browse Products</Link>
-          </div>
-        ) : (
-          <div className="cart-layout" style={{display:'grid',gridTemplateColumns:'1fr 380px',gap:24,alignItems:'start'}}>
-            {/* Items */}
-            <section className="cart-items" aria-label="Shopping cart items" style={{display:'flex',flexDirection:'column',gap:16}}>
-              {items.map((item, idx)=>{
-                const product = item.product || {};
-                const price = Number(item.price ?? item.product_price ?? product.price ?? 0);
-                const quantity = Number(item.quantity || 0);
-                const total = price * quantity;
-                const isUpdating = updatingId===item.id;
-                const isRemoving = removingId===item.id;
-                const name = item.product_name || product.name || `Product #${item.product}`;
-                const image = product.image || product.thumbnail;
-                const originalPrice = Number(product.original_price || product.mrp || 0);
-                const hasDiscount = originalPrice > price;
-
+        {saved.length>0 && (
+          <div className="bg-white mt-3 shadow-sm rounded- border border-[#d5d9d9] p-4">
+            <h2 className="font-bold text-">Saved for later ({saved.length} items) • Move to cart or delete</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              {saved.map((it)=>{
+                const p = it.product || it;
+                const name = p.name || it.product_name || "Product";
+                const img = getCartImageUrl(it);
                 return (
-                  <article
-                    key={item.id}
-                    className="cart-item"
-                    style={{
-                      display:'grid',gridTemplateColumns:'110px 1fr auto',
-                      gap:18,padding:20,background:'#fff',border:'1px solid #ece8de',
-                      borderRadius:20,boxShadow:'0 2px 10px rgba(0,0,0,.04)',
-                      opacity: isRemoving ? .6 : 1, transform: isRemoving ? 'scale(.98)' : 'scale(1)',
-                      transition:'.3s cubic-bezier(.16,1,.3,1)', animation:`fadeIn .4s both`,
-                      animationDelay:`${idx*50}ms`
-                    }}
-                  >
-                    <div className="cart-item-image" style={{width:110,height:110,background:'#fafaf7',borderRadius:16,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',border:'1px solid #ece8de'}}>
-                      {image ? <img src={image} alt={name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.currentTarget.style.display='none'} /> : <span style={{fontSize:36}}>📦</span>}
-                    </div>
-
-                    <div className="cart-item-info" style={{minWidth:0}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                        <span style={{fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'#b8b3a9'}}>{product.category || 'E-SHOP'}</span>
-                        {product.rating && <span style={{fontSize:11,padding:'2px 6px',background:'#fffbeb',borderRadius:999,fontWeight:700}}>★ {product.rating}</span>}
-                      </div>
-                      <h3 style={{margin:'0 0 6px',fontSize:16,fontWeight:700,color:'#1a1816',lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{name}</h3>
-                      <p style={{margin:'0 0 14px',display:'flex',alignItems:'baseline',gap:8}}>
-                        <span style={{fontSize:16,fontWeight:800,color:'#1a1816'}}>₹{price.toLocaleString("en-IN")}</span>
-                        {hasDiscount && <span style={{fontSize:12,color:'#b8b3a9',textDecoration:'line-through'}}>₹{originalPrice.toLocaleString("en-IN")}</span>}
-                      </p>
-
-                      <div className="cart-item-controls" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:0,border:'1px solid #ece8de',borderRadius:999,background:'#fff',overflow:'hidden',height:38}}>
-                          <button
-                            type="button"
-                            disabled={isUpdating||isRemoving||quantity<=1}
-                            onClick={()=>updateQuantity(item.id,quantity-1)}
-                            style={{width:38,height:38,border:0,background:'transparent',display:'grid',placeItems:'center',cursor:'pointer',fontSize:16,fontWeight:700,opacity: quantity<=1 ? .3 : 1}}
-                          >−</button>
-                          <div style={{width:44,textAlign:'center',fontSize:14,fontWeight:800,borderLeft:'1px solid #ece8de',borderRight:'1px solid #ece8de',height:38,display:'grid',placeItems:'center'}}>
-                            {isUpdating ? '...' : quantity}
-                          </div>
-                          <button
-                            type="button"
-                            disabled={isUpdating||isRemoving}
-                            onClick={()=>updateQuantity(item.id,quantity+1)}
-                            style={{width:38,height:38,border:0,background:'transparent',display:'grid',placeItems:'center',cursor:'pointer',fontSize:16,fontWeight:700}}
-                          >+</button>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={isUpdating||isRemoving}
-                          onClick={()=>handleRemove(item.id)}
-                          style={{minHeight:36,padding:'0 14px',border:'1px solid #ece8de',borderRadius:999,background:'#fff',fontSize:12,fontWeight:700,color:'#8c8881',cursor:'pointer',transition:'.2s'}}
-                        >
-                          {isRemoving ? 'Removing...' : 'Remove'}
-                        </button>
-
-                        {isUpdating && <small style={{fontSize:11,color:'#8c8881',fontWeight:600}}>Updating...</small>}
-                      </div>
-                    </div>
-
-                    <div className="cart-item-total" style={{textAlign:'right',minWidth:90}}>
-                      <div style={{fontSize:18,fontWeight:900,color:'#1a1816'}}>₹{total.toLocaleString("en-IN")}</div>
-                      <div style={{fontSize:11,color:'#8c8881',marginTop:4}}>{quantity} × ₹{price.toLocaleString("en-IN")}</div>
-                    </div>
-                  </article>
+                  <div key={it.id} className="border border-[#d5d9d9] rounded- p-3 hover:shadow-sm">
+                    <img src={img} alt="" className="w-full h-24 object-contain bg-[#f7f7f7] rounded-" />
+                    <div className="text- line-clamp-2 mt-2 h-8 leading-">{name}</div>
+                    <div className="font-bold text- mt-1">₹{Number(p.price||it.price||0).toLocaleString("en-IN")}</div>
+                    <div className="text- text-[#067D62]">In stock • Prime</div>
+                    <button disabled={savingId===it.id} onClick={()=>handleMoveToCart(it.id)} className="mt-2 w-full h-7 border border-[#d5d9d9] rounded- text- bg-white hover:bg-[#f7fafa] shadow-sm">{savingId===it.id?'Moving...':'Move to cart'}</button>
+                    <button onClick={()=>handleRemove(it.id)} className="mt-1 w-full h-6 text- text-[#0066c0] hover:underline">Delete</button>
+                  </div>
                 );
               })}
-            </section>
+            </div>
+          </div>
+        )}
 
-            {/* Summary - Premium */}
-            <aside className="cart-summary" style={{
-              position:'sticky',top:96,background:'#fff',border:'1px solid #ece8de',
-              borderRadius:20,padding:24,boxShadow:'0 8px 24px rgba(0,0,0,.06)'
-            }}>
-              <h2 style={{margin:'0 0 20px',fontSize:18,fontWeight:900,letterSpacing:'-.02em'}}>Order Summary</h2>
-
-              <div style={{display:'flex',flexDirection:'column',gap:0}}>
-                <div className="cart-summary-row" style={{display:'flex',justifyContent:'space-between',padding:'12px 0',fontSize:14,borderBottom:'1px solid #f5f2eb'}}>
-                  <span style={{color:'#8c8881'}}>Items ({totalItems})</span>
-                  <strong style={{fontWeight:700}}>{totalItems}</strong>
-                </div>
-                <div className="cart-summary-row" style={{display:'flex',justifyContent:'space-between',padding:'12px 0',fontSize:14,borderBottom:'1px solid #f5f2eb'}}>
-                  <span style={{color:'#8c8881'}}>Subtotal</span>
-                  <strong style={{fontWeight:700}}>₹{subtotal.toLocaleString("en-IN")}</strong>
-                </div>
-                <div className="cart-summary-row" style={{display:'flex',justifyContent:'space-between',padding:'12px 0',fontSize:14,borderBottom:'1px solid #f5f2eb'}}>
-                  <span style={{color:'#8c8881'}}>Shipping</span>
-                  <strong style={{color:'#10b981'}}>Free ✓</strong>
-                </div>
-                <div className="cart-summary-row" style={{display:'flex',justifyContent:'space-between',padding:'12px 0',fontSize:14}}>
-                  <span style={{color:'#8c8881'}}>Tax</span>
-                  <span style={{fontWeight:600}}>Included</span>
-                </div>
-              </div>
-
-              <div className="cart-summary-total" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,padding:'16px 0',borderTop:'1px solid #ece8de'}}>
-                <span style={{fontSize:16,fontWeight:800,color:'#1a1816'}}>Total</span>
-                <strong style={{fontSize:22,fontWeight:900,color:'#1a1816'}}>₹{subtotal.toLocaleString("en-IN")}</strong>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-primary cart-checkout-button"
-                onClick={()=>navigate("/checkout")}
-                disabled={isBusy || items.length===0}
-                style={{
-                  width:'100%',minHeight:52,marginTop:8,borderRadius:999,
-                  background:'#1a1816',color:'#fff',border:'1px solid #1a1816',
-                  fontSize:15,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-                  boxShadow:'0 8px 20px rgba(0,0,0,.18)',cursor:'pointer',transition:'.25s',
-                  opacity: isBusy||items.length===0 ? .6 : 1
-                }}
-              >
-                Proceed to Checkout <span>→</span>
-              </button>
-
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:16,fontSize:11,color:'#b8b3a9',fontWeight:600}}>
-                <span>🔒</span> Secure checkout • 30 days returns
-              </div>
-
-              <div style={{marginTop:20,padding:12,background:'#fafaf7',border:'1px dashed #ece8de',borderRadius:12,fontSize:12,lineHeight:1.5}}>
-                <strong style={{display:'block',fontSize:11,marginBottom:4,color:'#1a1816'}}>🎁 OFFER</strong>
-                Add ₹{Math.max(0,999-subtotal).toLocaleString("en-IN")} more for free delivery!
-              </div>
-            </aside>
+        {buyAgain.length>0 && (
+          <div className="bg-white mt-3 shadow-sm rounded- border border-[#d5d9d9] p-4">
+            <h2 className="font-bold text-">Buy Again • Based on your orders • Inspired by your browsing</h2>
+            <div className="flex gap-3 overflow-auto mt-3 pb-2">
+              {buyAgain.map((p)=>(
+                <Link key={p.id} to={`/product/${p.id}`} className="min-w- border border-[#d5d9d9] rounded- p-2 hover:shadow-sm bg-white">
+                  <img src={getImageUrl(p) || PLACEHOLDER} alt="" className="w-full h-20 object-contain bg-[#f7fafa] rounded-" />
+                  <div className="text- line-clamp-2 mt-1 h-8">{p.name}</div>
+                  <div className="text- font-bold">₹{Number(p.price||0).toLocaleString("en-IN")}</div>
+                  <div className="mt-1 h-6 bg-[#FFD814] border border-[#FCD200] rounded- grid place-items-center text-">Add to Cart</div>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
-        @media(max-width:1100px){
-          .cart-layout { grid-template-columns:1fr !important; }
-          .cart-summary { position:static !important; }
-        }
-        @media(max-width:600px){
-          .cart-item { grid-template-columns:80px 1fr !important; }
-          .cart-item-total { grid-column:1 / -1; text-align:left !important; display:flex; justify-content:space-between; align-items:center; }
-        }
-      `}</style>
-    </main>
+    </div>
   );
 }
 

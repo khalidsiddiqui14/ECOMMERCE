@@ -19,21 +19,21 @@ function EditProduct() {
       setLoading(true); setError("");
       try {
         const data = await getVendorProducts();
-        const products = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+        const products = Array.isArray(data)? data : Array.isArray(data?.results)? data.results : [];
         const product = products.find(item => String(item.id) === String(id));
         if (!product) { if (!cancelled) setError("Product not found."); return; }
         if (cancelled) return;
         setForm({
-          category: product.category ?? "",
-          brand: product.brand ?? "",
-          name: product.name ?? "",
-          slug: product.slug ?? "",
-          sku: product.sku ?? "",
-          description: product.description ?? "",
-          price: product.price ?? "",
-          stock: product.stock ?? "",
-          status: product.status ?? "PUBLISHED",
-          is_active: product.is_active ?? true,
+          category: product.category?? "",
+          brand: product.brand?? "",
+          name: product.name?? "",
+          slug: product.slug?? "",
+          sku: product.sku?? "",
+          description: product.description?? "",
+          price: product.price?? "",
+          stock: product.stock?? "",
+          status: product.status?? "PUBLISHED",
+          is_active: product.is_active?? true,
         });
       } catch (err) {
         if (!cancelled) setError(err.response?.data?.detail || "Product load nahi ho paaya.");
@@ -45,7 +45,7 @@ function EditProduct() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(p => ({ ...p, [name]: type==="checkbox" ? checked : value }));
+    setForm(p => ({...p, [name]: type==="checkbox"? checked : value }));
     setError(""); setSuccess("");
   };
 
@@ -55,8 +55,8 @@ function EditProduct() {
     setForm(p => {
       const gen = slugify(name);
       const prevGen = slugify(p.name);
-      const should = !p.slug || p.slug===prevGen;
-      return { ...p, name, slug: should ? gen : p.slug };
+      const should =!p.slug || p.slug===prevGen;
+      return {...p, name, slug: should? gen : p.slug };
     });
     setError(""); setSuccess("");
   };
@@ -81,8 +81,8 @@ function EditProduct() {
     const data = err.response?.data;
     if (!data) return err.message || "Product update nahi ho paaya.";
     if (typeof data==="string") return data;
-    if (data.detail) return Array.isArray(data.detail) ? data.detail.join(", ") : String(data.detail);
-    return Object.entries(data).map(([f,m])=>`${f}: ${Array.isArray(m) ? m.join(", ") : String(m)}`).join(" | ");
+    if (data.detail) return Array.isArray(data.detail)? data.detail.join(", ") : String(data.detail);
+    return Object.entries(data).map(([f,m])=>`${f}: ${Array.isArray(m)? m.join(", ") : String(m)}`).join(" | ");
   };
 
   const handleSubmit = async (e) => {
@@ -101,7 +101,7 @@ function EditProduct() {
         stock: Number(form.stock),
         status: form.status,
         is_active: form.is_active,
-        brand: form.brand!=="" ? Number(form.brand) : null,
+        brand: form.brand!==""? Number(form.brand) : null,
       };
       await updateVendorProduct(id, productData);
       setSuccess("Product updated successfully.");
@@ -113,62 +113,60 @@ function EditProduct() {
 
   if (loading) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'24px'}}>
-        <div style={{maxWidth:900,margin:'0 auto'}}>
-          <div style={{height:80,background:'#fff',border:'1px solid #ece8de',borderRadius:20,marginBottom:16,animation:'pulse 1.5s infinite'}} />
-          <div style={{height:500,background:'#fff',border:'1px solid #ece8de',borderRadius:20,animation:'pulse 1.5s infinite'}} />
+      <div className="bg-[#EAEDED] min-h-screen p-4">
+        <div className="max-w- mx-auto">
+          <div className="h-16 bg-white border border-[#d5d9d9] rounded- mb-3 animate-pulse" />
+          <div className="h- bg-white border border-[#d5d9d9] rounded- animate-pulse" />
         </div>
-      </main>
+      </div>
     );
   }
 
-  if (error && !form.name) {
+  if (error &&!form.name) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'40px 24px',display:'grid',placeItems:'center'}}>
-        <div style={{textAlign:'center',padding:40,background:'#fff',border:'1px solid #ece8de',borderRadius:24,maxWidth:420}}>
-          <div style={{width:64,height:64,margin:'0 auto 12px',display:'grid',placeItems:'center',background:'#fef2f2',borderRadius:'50%',fontSize:28}}>📦</div>
-          <h2 style={{margin:'0 0 8px',fontWeight:900}}>Product Not Found</h2>
-          <p style={{color:'#8c8881',fontSize:13}}>{error}</p>
-          <Link to="/vendor/products" style={{marginTop:16,minHeight:40,padding:'0 18px',display:'inline-flex',alignItems:'center',borderRadius:999,background:'#1a1816',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}>Back to Products</Link>
+      <div className="bg-[#EAEDED] min-h-screen p-4 grid place-items-center">
+        <div className="bg-white border border-[#d5d9d9] rounded- p-8 text-center max-w- shadow-sm">
+          <div className="text-4xl mb-2">📦</div>
+          <h2 className="font-bold">Product Not Found</h2>
+          <p className="text- text-[#565959] mt-1">{error}</p>
+          <Link to="/vendor/products" className="mt-4 inline-flex h-8 px-4 bg-[#131921] text-white rounded- text- items-center">Back to Products</Link>
         </div>
-      </main>
+      </div>
     );
   }
 
-  const Input = ({ label, id, required, ...props }) => (
-    <div className="form-group" style={{display:'flex',flexDirection:'column',gap:6}}>
-      <label htmlFor={id} style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:'#1a1816'}}>{label}{required && <span style={{color:'#ef4444',marginLeft:2}}>*</span>}</label>
-      <input id={id} {...props} style={{minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:12,background:'#fff',outline:'none',fontSize:13,transition:'.2s'}} />
+  const Input = ({ label, id, required,...props }) => (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text- font-bold uppercase">{label}{required && <span className="text-[#CC0C39] ml-0.5">*</span>}</label>
+      <input id={id} {...props} className="h-8 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)]" />
     </div>
   );
 
   return (
-    <main className="vendor-create-product-page" style={{minHeight:'100vh',background:'#fafaf7',padding:'24px'}}>
-      <div className="vendor-container" style={{maxWidth:900,margin:'0 auto'}}>
-        {/* Header like Flipkart Seller */}
-        <div className="vendor-products-header" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:16,marginBottom:20}}>
+    <div className="bg-[#EAEDED] min-h-screen py-2">
+      <div className="max-w- mx-auto px-2">
+        <div className="bg-white border border-[#d5d9d9] rounded- p-4 flex justify-between items-center shadow-sm">
           <div>
-            <span style={{display:'inline-flex',padding:'4px 10px',borderRadius:999,background:'#1a1816',color:'#fff',fontSize:10,fontWeight:800,letterSpacing:'.06em',marginBottom:8}}>VENDOR PANEL • EDIT MODE</span>
-            <h1 style={{margin:'0 0 6px',fontSize:'clamp(22px,3vw,28px)',fontWeight:900,letterSpacing:'-.02em'}}>Edit Product</h1>
-            <p style={{margin:0,color:'#8c8881',fontSize:13}}>Update your product information. ID: <strong>#{id}</strong></p>
+            <div className="text- font-bold uppercase text-[#C45500]">AMAZON SELLER CENTRAL • EDIT MODE</div>
+            <h1 className="text- font-bold">Edit Product #{id}</h1>
+            <p className="text- text-[#565959]">Update your product information.</p>
           </div>
-          <div style={{display:'flex',gap:8}}>
-            <Link to={`/vendor/products/${id}`} style={{minHeight:40,padding:'0 16px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:13,fontWeight:600,textDecoration:'none',color:'#1a1816'}}>View Live</Link>
-            <Link to="/vendor/products" style={{minHeight:40,padding:'0 18px',display:'inline-flex',alignItems:'center',borderRadius:999,background:'#fff',border:'1px solid #ece8de',fontSize:13,fontWeight:600,textDecoration:'none',color:'#1a1816'}}>← Back to Products</Link>
+          <div className="flex gap-2">
+            <Link to={`/vendor/products/${id}`} className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- grid place-items-center shadow-sm">View Live</Link>
+            <Link to="/vendor/products" className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- grid place-items-center shadow-sm">← Back</Link>
           </div>
         </div>
 
-        {error && <div role="alert" style={{padding:'12px 16px',marginBottom:16,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,color:'#991b1b',fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
-        {success && <div role="status" style={{padding:'12px 16px',marginBottom:16,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,color:'#166534',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8}}>✓ {success}<span style={{marginLeft:'auto',fontSize:11}}>Redirecting...</span></div>}
+        {error && <div className="mt-2 bg-white border-l-4 border-[#c40000] p-3 text- text-[#c40000] shadow-sm">⚠ {error}</div>}
+        {success && <div className="mt-2 bg-white border-l-4 border-[#067D62] p-3 text- text-[#067D62] shadow-sm flex justify-between">✓ {success}<span className="text-">Redirecting...</span></div>}
 
-        <div className="vendor-form-card" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:28,boxShadow:'0 4px 20px rgba(0,0,0,.04)'}}>
-          <form onSubmit={handleSubmit} noValidate style={{display:'flex',flexDirection:'column',gap:20}}>
-            {/* Top grid */}
-            <div className="vendor-form-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-              <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                <label htmlFor="name" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'}}>Product Name *</label>
-                <input id="name" name="name" type="text" value={form.name} onChange={handleNameChange} disabled={saving} maxLength={255} required style={{minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:12,outline:'none',fontSize:14,fontWeight:600}} />
-                <span style={{fontSize:10,color:'#b8b3a9'}}>{form.name.length}/255</span>
+        <div className="mt-2 bg-white border border-[#d5d9d9] rounded- p-5 shadow-sm">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text- font-bold uppercase">Product Name *</label>
+                <input name="name" type="text" value={form.name} onChange={handleNameChange} disabled={saving} maxLength={255} required className="h-8 px-2 border border-[#a6a6a6] rounded- text- font-medium outline-none" />
+                <span className="text- text-[#767676]">{form.name.length}/255</span>
               </div>
               <Input label="SKU" id="sku" name="sku" type="text" value={form.sku} onChange={handleChange} disabled={saving} maxLength={100} required placeholder="IPHONE15-128-BLK" />
               <Input label="Category ID" id="category" name="category" type="number" min="1" step="1" value={form.category} onChange={handleChange} disabled={saving} required />
@@ -177,57 +175,51 @@ function EditProduct() {
               <Input label="Stock Qty" id="stock" name="stock" type="number" min="0" step="1" value={form.stock} onChange={handleChange} disabled={saving} required />
             </div>
 
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <label htmlFor="slug" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'}}>Slug (URL) *</label>
-              <div style={{display:'flex',gap:8}}>
-                <input id="slug" name="slug" type="text" value={form.slug} onChange={handleChange} disabled={saving} maxLength={255} required style={{flex:1,minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:12,outline:'none',fontSize:13,background:'#fafaf7'}} />
-                <button type="button" onClick={()=>setForm(p=>({...p, slug: form.name.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}))} style={{minHeight:44,padding:'0 14px',borderRadius:12,border:'1px solid #ece8de',background:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>Regenerate</button>
+            <div className="flex flex-col gap-1">
+              <label className="text- font-bold uppercase">Slug (URL) *</label>
+              <div className="flex gap-2">
+                <input name="slug" type="text" value={form.slug} onChange={handleChange} disabled={saving} maxLength={255} required className="flex-1 h-8 px-2 border border-[#a6a6a6] rounded- text- bg-[#f0f2f2] outline-none" />
+                <button type="button" onClick={()=>setForm(p=>({...p, slug: form.name.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}))} className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- shadow-sm">Regenerate</button>
               </div>
-              <span style={{fontSize:11,color:'#8c8881'}}>Preview: <code style={{background:'#fafaf7',padding:'2px 6px',borderRadius:6,fontSize:11}}>/products/{form.slug || "your-product-slug"}</code></span>
+              <span className="text- text-[#565959]">Preview: <code className="bg-[#f0f2f2] px-1 rounded">/products/{form.slug || "your-product-slug"}</code></span>
             </div>
 
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <label htmlFor="description" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'}}>Description *</label>
-              <textarea id="description" name="description" rows={6} value={form.description} onChange={handleChange} disabled={saving} maxLength={5000} required style={{padding:14,border:'1px solid #ece8de',borderRadius:12,outline:'none',fontSize:13,lineHeight:1.5,resize:'vertical'}} placeholder="Describe features, material, warranty..." />
-              <div style={{display:'flex',justifyContent:'space-between'}}>
-                <small style={{fontSize:11,color: form.description.length>4500 ? '#ef4444' : '#8c8881'}}>{form.description.length}/5000 characters</small>
-                <small style={{fontSize:11,color:'#8c8881'}}>{form.description.length<50 ? "Add more details for better ranking" : "✓ Good length"}</small>
-              </div>
+            <div className="flex flex-col gap-1">
+              <label className="text- font-bold uppercase">Description *</label>
+              <textarea name="description" rows={5} value={form.description} onChange={handleChange} disabled={saving} maxLength={5000} required placeholder="Describe features, material, warranty..." className="p-2 border border-[#a6a6a6] rounded- text- outline-none resize-y" />
+              <div className="flex justify-between text- text-[#767676]"><span>{form.description.length}/5000 characters</span><span>{form.description.length<50? "Add more details" : "✓ Good length"}</span></div>
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,padding:16,background:'#fafaf7',border:'1px dashed #ece8de',borderRadius:12}}>
-              <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                <label htmlFor="status" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'}}>Status</label>
-                <select id="status" name="status" value={form.status} onChange={handleChange} disabled={saving} style={{minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:12,background:'#fff',fontSize:13,outline:'none'}}>
-                  <option value="PUBLISHED">🟢 Published - Live on store</option>
-                  <option value="DRAFT">🟡 Draft - Hidden</option>
-                  <option value="OUT_OF_STOCK">🔴 Out of Stock</option>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-[#f0f2f2] border border-[#d5d9d9] rounded-">
+              <div className="flex flex-col gap-1">
+                <label className="text- font-bold uppercase">Status</label>
+                <select name="status" value={form.status} onChange={handleChange} disabled={saving} className="h-8 px-2 border border-[#a6a6a6] rounded- bg-white text- outline-none">
+                  <option value="PUBLISHED">Published - Live on store</option>
+                  <option value="DRAFT">Draft - Hidden</option>
+                  <option value="OUT_OF_STOCK">Out of Stock</option>
                 </select>
               </div>
-              <label style={{display:'flex',alignItems:'center',gap:12,padding:'0 16px',minHeight:44,background:'#fff',border:'1px solid #ece8de',borderRadius:12,cursor:'pointer',marginTop:18}}>
-                <input id="is_active" name="is_active" type="checkbox" checked={form.is_active} onChange={handleChange} disabled={saving} style={{width:18,height:18,accentColor:'#1a1816'}} />
-                <span style={{fontSize:13,fontWeight:700}}>Product is active & visible</span>
+              <label className="flex items-center gap-2 h-8 px-3 bg-white border border-[#d5d9d9] rounded- mt-5 cursor-pointer">
+                <input name="is_active" type="checkbox" checked={form.is_active} onChange={handleChange} disabled={saving} className="w-4 h-4 accent-[#e77600]" />
+                <span className="text- font-bold">Product is active & visible</span>
               </label>
             </div>
 
-            <div className="vendor-form-actions" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,paddingTop:12,borderTop:'1px solid #f5f2eb'}}>
-              <div style={{fontSize:11,color:'#8c8881'}}>Last updated: Just now • Auto-save draft enabled</div>
-              <div style={{display:'flex',gap:8}}>
-                <Link to="/vendor/products" style={{minHeight:44,padding:'0 20px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:13,fontWeight:600,textDecoration:'none',color:'#1a1816'}}>Cancel</Link>
-                <button type="submit" disabled={saving} style={{minHeight:44,padding:'0 24px',borderRadius:999,background:'#1a1816',color:'#fff',border:'1px solid #1a1816',fontSize:13,fontWeight:800,cursor: saving ? 'not-allowed' : 'pointer',opacity: saving ? .7 : 1,boxShadow:'0 6px 18px rgba(0,0,0,.18)',display:'flex',alignItems:'center',gap:8}}>
-                  {saving ? (<><span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}} /> Saving...</>) : "💾 Save Changes"}
+            <div className="flex justify-between items-center pt-3 border-t border-[#e7e7e7]">
+              <div className="text- text-[#767676]">Last updated: Just now</div>
+              <div className="flex gap-2">
+                <Link to="/vendor/products" className="h-8 px-4 grid place-items-center bg-white border border-[#d5d9d9] rounded- text- shadow-sm">Cancel</Link>
+                <button type="submit" disabled={saving} className="h-8 px-5 bg-[#FFD814] border border-[#FCD200] rounded- text- shadow-sm disabled:opacity-50 font-bold">
+                  {saving? "Saving..." : "💾 Save Changes"}
                 </button>
               </div>
             </div>
           </form>
         </div>
 
-        <div style={{marginTop:16,padding:12,background:'#fffbeb',border:'1px solid #fde68a',borderRadius:12,fontSize:11,color:'#92400e',lineHeight:1.5}}>
-          💡 <strong>Flipkart Seller Tip:</strong> Good slug + detailed description improves SEO ranking. Keep price competitive, stock updated for better visibility.
-        </div>
+        <div className="mt-2 p-3 bg-[#fef8f2] border border-[#f3a847] rounded- text- text-[#C45500]">💡 <strong>Amazon Seller Tip:</strong> Good slug + detailed description improves ranking. Keep price competitive.</div>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1} 50%{opacity:.6}} @keyframes spin{to{transform:rotate(360deg)}} @media(max-width:700px){.vendor-form-grid{grid-template-columns:1fr !important;}}`}</style>
-    </main>
+    </div>
   );
 }
 

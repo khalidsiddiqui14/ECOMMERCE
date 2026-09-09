@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/reviews/", include("apps.reviews.urls")),
     path("api/coupons/", include("apps.coupons.urls")),
     path("api/ai/", include("apps.ai.urls")),
+    path('api/admin-panel/', include('apps.admin_panel.urls')),
 ]
 
 

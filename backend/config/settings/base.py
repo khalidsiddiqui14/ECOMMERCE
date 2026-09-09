@@ -77,6 +77,8 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.core",
     "apps.addresses",
+    "apps.admin_panel",
+
 ]
 
 

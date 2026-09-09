@@ -4,6 +4,21 @@ import { getProducts } from "../services/productService";
 import { addToCart } from "../services/cartService";
 import { addToWishlist } from "../services/wishlistService";
 
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/.*$/, "") || "http://127.0.0.1:8000";
+const PLACEHOLDER = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop";
+
+const resolveImg = (src) => {
+  try {
+    if (!src) return "";
+    let s = typeof src === "string"? src : src.image || src.url || "";
+    if (!s) return "";
+    s = String(s);
+    if (s.startsWith("http")) return s;
+    if (s.startsWith("/media")) return `${BASE}${s}`;
+    return `${BASE}/media/${s.replace(/^\/+/, "")}`;
+  } catch { return ""; }
+};
+
 function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +27,7 @@ function Products() {
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState("latest");
   const [priceRange, setPriceRange] = useState([0, 100000]);
-  const [viewMode, setViewMode] = useState("grid"); // grid | list
+  const [viewMode, setViewMode] = useState("grid");
   const [addingId, setAddingId] = useState(null);
   const [wishId, setWishId] = useState(null);
   const [cartMessage, setCartMessage] = useState("");
@@ -23,11 +38,11 @@ function Products() {
     try {
       const data = await getProducts();
       if (!isMounted) return;
-      const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-      setProducts(list);
+      const list = Array.isArray(data)? data : Array.isArray(data?.results)? data.results : data?.products || [];
+      setProducts(Array.isArray(list)? list : []);
     } catch (err) {
       if (!isMounted) return;
-      setError(err.response?.data?.detail || "Products load nahi ho paaye.");
+      setError(err.response?.data?.detail || err.message || "Products load failed.");
     } finally {
       if (isMounted) setLoading(false);
     }
@@ -40,15 +55,15 @@ function Products() {
   }, [loadProducts]);
 
   const categories = useMemo(() => {
-    const vals = products.map(p => p.category_name || p.category).filter(Boolean);
-    return [...new Set(vals)].sort((a,b)=>String(a).localeCompare(String(b)));
+    const vals = products.map(p => p.category_name || p.category?.name || p.category).filter(Boolean);
+    return [...new Set(vals.map(v=>String(v)))].sort((a,b)=>a.localeCompare(b));
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     let res = [...products];
     const q = search.trim().toLowerCase();
-    if (q) res = res.filter(p => String(p.name||"").toLowerCase().includes(q) || String(p.description||"").toLowerCase().includes(q) || String(p.category_name||p.category||"").toLowerCase().includes(q));
-    if (category) res = res.filter(p => String(p.category_name||p.category||"") === category);
+    if (q) res = res.filter(p => String(p.name||"").toLowerCase().includes(q) || String(p.description||"").toLowerCase().includes(q) || String(p.category_name||p.category?.name||p.category||"").toLowerCase().includes(q));
+    if (category) res = res.filter(p => String(p.category_name||p.category?.name||p.category||"") === category);
     res = res.filter(p => {
       const price = Number(p.price||0);
       return price >= priceRange[0] && price <= priceRange[1];
@@ -68,10 +83,11 @@ function Products() {
     setAddingId(product.id); setCartMessage(""); setCartError("");
     try {
       await addToCart(product.id, 1);
-      setCartMessage(`${product.name || "Product"} cart mein add ho gaya.`);
+      window.dispatchEvent(new Event("cart-change"));
+      setCartMessage(`${product.name || "Product"} added to cart • Prime FREE`);
       setTimeout(()=>setCartMessage(""), 3500);
     } catch (err) {
-      setCartError(err.response?.data?.detail || "Cart mein add nahi ho paaya.");
+      setCartError(err.response?.data?.detail || err.message || "Add to cart failed.");
     } finally {
       setAddingId(null);
     }
@@ -82,10 +98,11 @@ function Products() {
     setWishId(product.id);
     try {
       await addToWishlist(product.id);
-      setCartMessage(`♡ ${product.name} wishlist mein add ho gaya.`);
+      window.dispatchEvent(new Event("wishlist-change"));
+      setCartMessage(`♡ ${product.name} added to wishlist`);
       setTimeout(()=>setCartMessage(""), 3000);
     } catch (err) {
-      setCartError(err.response?.data?.detail || "Wishlist mein add nahi ho paaya.");
+      setCartError(err.response?.data?.detail || "Wishlist failed.");
     } finally {
       setWishId(null);
     }
@@ -93,225 +110,143 @@ function Products() {
 
   if (loading) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'32px 24px'}}>
-        <div style={{maxWidth:1200,margin:'0 auto'}}>
-          <div style={{height:100,background:'#fff',border:'1px solid #ece8de',borderRadius:20,marginBottom:20,animation:'pulse 1.5s infinite'}} />
-          <div style={{display:'grid',gridTemplateColumns:'260px 1fr',gap:20}}>
-            <div style={{height:400,background:'#fff',border:'1px solid #ece8de',borderRadius:20,animation:'pulse 1.5s infinite'}} />
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18}}>
-              {[1,2,3,4,5,6].map(i=>(<div key={i} style={{height:340,background:'#fff',border:'1px solid #ece8de',borderRadius:20,animation:'pulse 1.5s infinite'}} />))}
-            </div>
+      <div className="bg-[#EAEDED] min-h-screen p-4">
+        <div className="max-w- mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+          <div className="h- bg-white border border-[#d5d9d9] rounded- animate-pulse" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[1,2,3,4,5,6].map(i=>(<div key={i} className="h- bg-white border border-[#d5d9d9] rounded- animate-pulse" />))}
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'40px 24px',display:'grid',placeItems:'center'}}>
-        <div style={{textAlign:'center',padding:40,background:'#fff',border:'1px solid #ece8de',borderRadius:24,maxWidth:420}}>
-          <h2 style={{fontWeight:900}}>Unable to load products</h2>
-          <p style={{color:'#8c8881'}}>{error}</p>
-          <button onClick={()=>loadProducts()} style={{marginTop:16,minHeight:42,padding:'0 20px',borderRadius:999,background:'#1a1816',color:'#fff',border:0,fontWeight:700}}>Try Again</button>
+      <div className="bg-[#EAEDED] min-h-screen p-4 grid place-items-center">
+        <div className="bg-white border border-[#d5d9d9] rounded- p-8 text-center shadow-sm max-w-">
+          <div className="text-">⚠️</div>
+          <h2 className="font-bold text- mt-2">Unable to load products</h2>
+          <p className="text- text-[#565959] mt-1">{error}</p>
+          <button onClick={()=>loadProducts(true)} className="mt-4 h-8 px-4 bg-[#FFD814] border border-[#FCD200] rounded- text- shadow-sm font-bold">Try Again</button>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="products-page" style={{minHeight:'100vh',background:'#fafaf7',padding:'24px'}}>
-      {/* Hero Header */}
-      <section style={{maxWidth:1200,margin:'0 auto 20px',background:'#1a1816',borderRadius:24,padding:'28px 24px',color:'#fff',position:'relative',overflow:'hidden'}}>
-        <div style={{position:'relative',zIndex:1,display:'flex',justifyContent:'space-between',alignItems:'flex-end',flexWrap:'wrap',gap:16}}>
+    <div className="bg-[#EAEDED] min-h-screen pb-4">
+      <div className="max-w- mx-auto px-2 pt-2">
+        <div className="bg-[#131921] rounded- p-4 md:p-5 text-white flex justify-between items-center shadow-sm">
           <div>
-            <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(255,255,255,.1)',borderRadius:999,fontSize:10,fontWeight:800,letterSpacing:'.08em',marginBottom:12}}>✦ NEW COLLECTION 2026</div>
-            <h1 style={{margin:'0 0 8px',fontSize:'clamp(28px,4vw,38px)',fontWeight:900,letterSpacing:'-.03em'}}>All Products</h1>
-            <p style={{margin:0,color:'rgba(255,255,255,.6)',fontSize:14}}>Curated quality • <strong style={{color:'#fff'}}>{products.length} products</strong> • Free delivery above ₹999</p>
+            <h1 className="text- md:text- font-bold">All Products • {products.length} results • Prime FREE Delivery</h1>
+            <p className="text- text-[#febd69] mt-1">Free delivery above ₹499 • EMI • COD • 10 days return • {filteredProducts.length} filtered</p>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(255,255,255,.08)',borderRadius:999,fontSize:12}}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:'#10b981',display:'inline-block',boxShadow:'0 0 0 3px rgba(16,185,129,.3)'}} /> Live Stock
-            </div>
-            <div style={{display:'flex',border:'1px solid rgba(255,255,255,.15)',borderRadius:999,overflow:'hidden'}}>
-              <button onClick={()=>setViewMode("grid")} style={{width:36,height:36,display:'grid',placeItems:'center',background: viewMode==="grid" ? '#fff' : 'transparent',color: viewMode==="grid" ? '#1a1816' : 'rgba(255,255,255,.6)',border:0,cursor:'pointer',fontSize:14}}>⊞</button>
-              <button onClick={()=>setViewMode("list")} style={{width:36,height:36,display:'grid',placeItems:'center',background: viewMode==="list" ? '#fff' : 'transparent',color: viewMode==="list" ? '#1a1816' : 'rgba(255,255,255,.6)',border:0,cursor:'pointer',fontSize:14}}>☰</button>
-            </div>
+          <div className="flex items-center gap-2">
+            <button onClick={()=>setViewMode("grid")} className={`w-8 h-8 rounded- grid place-items-center text- border ${viewMode==="grid"? 'bg-white text-[#131921] border-white' : 'bg-[#232f3e] text-white border-[#37475a] hover:bg-[#37475a]'}`}>⊞</button>
+            <button onClick={()=>setViewMode("list")} className={`w-8 h-8 rounded- grid place-items-center text- border ${viewMode==="list"? 'bg-white text-[#131921] border-white' : 'bg-[#232f3e] text-white border-[#37475a] hover:bg-[#37475a]'}`}>☰</button>
           </div>
         </div>
-        <div style={{position:'absolute',width:300,height:300,right:-50,top:-50,background:'radial-gradient(circle,rgba(255,255,255,.08),transparent 70%)',borderRadius:'50%'}} />
-      </section>
+      </div>
 
-      {cartMessage && (
-        <div style={{maxWidth:1200,margin:'0 auto 16px',display:'flex',gap:10,alignItems:'center',padding:'12px 16px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:14,color:'#166534',fontSize:13,fontWeight:600,animation:'slideDown .3s'}}>
-          ✓ {cartMessage} <Link to="/cart" style={{marginLeft:'auto',padding:'6px 12px',borderRadius:999,background:'#166534',color:'#fff',fontSize:11,fontWeight:800}}>Go to Cart →</Link>
-        </div>
-      )}
-      {cartError && (
-        <div style={{maxWidth:1200,margin:'0 auto 16px',padding:'12px 16px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:14,color:'#991b1b',fontSize:13,fontWeight:600}}>
-          ⚠ {cartError}
-        </div>
-      )}
+      {cartMessage && <div className="max-w- mx-auto px-2 mt-2"><div className="bg-white border border-[#067D62] border-l- p-3 text- text-[#067D62] shadow-sm rounded- flex justify-between items-center">✓ {cartMessage} <Link to="/cart" className="bg-[#067D62] text-white px-3 py-1 rounded-full text- font-bold">Go to Cart →</Link></div></div>}
+      {cartError && <div className="max-w- mx-auto px-2 mt-2"><div className="bg-white border border-[#c40000] border-l- p-3 text- text-[#c40000] shadow-sm rounded- flex justify-between">⚠ {cartError} <button onClick={()=>setCartError("")} className="text-[#0066c0]">Dismiss</button></div></div>}
 
-      <section style={{maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'280px 1fr',gap:20,alignItems:'start'}}>
-        {/* Ultra Filter Sidebar */}
-        <aside style={{position:'sticky',top:88,background:'#fff',border:'1px solid #ece8de',borderRadius:20,overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,.04)'}}>
-          <div style={{padding:20,borderBottom:'1px solid #f5f2eb',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <h3 style={{margin:0,fontSize:13,fontWeight:900,letterSpacing:'.06em',display:'flex',alignItems:'center',gap:8}}>☰ FILTERS {hasFilters && <span style={{width:6,height:6,borderRadius:'50%',background:'#ef4444',display:'inline-block'}} />}</h3>
-            {hasFilters && <button onClick={clearFilters} style={{fontSize:11,fontWeight:800,color:'#ef4444',background:'#fef2f2',border:'1px solid #fecaca',padding:'4px 10px',borderRadius:999,cursor:'pointer'}}>Clear All ×</button>}
+      <div className="max-w- mx-auto px-2 mt-2 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-2 items-start">
+        <div className="bg-white border border-[#d5d9d9] rounded- shadow-sm sticky top-">
+          <div className="p-3 border-b border-[#e7e7e7] flex justify-between items-center">
+            <h3 className="text- font-bold uppercase tracking-wide">Filters {hasFilters && <span className="w-2 h-2 bg-[#CC0C39] rounded-full inline-block ml-1 animate-pulse" />}</h3>
+            {hasFilters && <button onClick={clearFilters} className="text- text-[#CC0C39] bg-[#fef2f2] border border-[#fecaca] px-2 py-1 rounded-full hover:bg-[#fee2e2]">Clear All ×</button>}
           </div>
-
-          <div style={{padding:20,display:'flex',flexDirection:'column',gap:22}}>
-            {/* Search */}
+          <div className="p-3 space-y-4">
             <div>
-              <label style={{display:'block',fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8,color:'#8c8881'}}>Search</label>
-              <div style={{position:'relative'}}>
-                <input type="search" placeholder="Search products..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:'100%',minHeight:42,padding:'0 36px 0 36px',border:'1px solid #ece8de',borderRadius:999,background:'#fafaf7',outline:'none',fontSize:13}} />
-                <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔍</span>
-                {search && <button onClick={()=>setSearch("")} style={{position:'absolute',right:6,top:6,width:30,height:30,borderRadius:'50%',border:'1px solid #ece8de',background:'#fff',display:'grid',placeItems:'center',cursor:'pointer'}}>×</button>}
+              <label className="text- font-bold uppercase text-[#565959] tracking-wide">Search • {filteredProducts.length} results</label>
+              <div className="relative mt-1">
+                <input type="search" placeholder="Search products, brands..." value={search} onChange={e=>setSearch(e.target.value)} className="w-full h-8 pl-7 pr-7 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)]" />
+                <span className="absolute left-2 top- text-">🔍</span>
+                {search && <button onClick={()=>setSearch("")} className="absolute right-2 top- text- text-[#565959]">✕</button>}
               </div>
             </div>
-
-            {/* Category Pills */}
             <div>
-              <label style={{display:'block',fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10,color:'#8c8881'}}>Category</label>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                <button onClick={()=>setCategory("")} style={{padding:'6px 12px',borderRadius:999,border:`1px solid ${!category ? '#1a1816' : '#ece8de'}`,background: !category ? '#1a1816' : '#fff',color: !category ? '#fff' : '#1a1816',fontSize:11,fontWeight:700,cursor:'pointer'}}>All</button>
+              <label className="text- font-bold uppercase text-[#565959] tracking-wide">Category • {categories.length} categories</label>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <button onClick={()=>setCategory("")} className={`px-2.5 py-1 rounded-full text- border font-medium ${!category? 'bg-[#131921] text-white border-[#131921]' : 'bg-white border-[#d5d9d9] hover:border-[#131921]'}`}>All ({products.length})</button>
                 {categories.map(c=>(
-                  <button key={String(c)} onClick={()=>setCategory(String(c))} style={{padding:'6px 12px',borderRadius:999,border:`1px solid ${category===c ? '#1a1816' : '#ece8de'}`,background: category===c ? '#1a1816' : '#fff',color: category===c ? '#fff' : '#1a1816',fontSize:11,fontWeight:700,cursor:'pointer'}}>{String(c)}</button>
+                  <button key={String(c)} onClick={()=>setCategory(String(c))} className={`px-2.5 py-1 rounded-full text- border font-medium ${category===String(c)? 'bg-[#131921] text-white border-[#131921]' : 'bg-white border-[#d5d9d9] hover:border-[#131921]'}`}>{String(c)}</button>
                 ))}
               </div>
             </div>
-
-            {/* Price Range */}
             <div>
-              <label style={{display:'block',fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10,color:'#8c8881'}}>Price Range • ₹{priceRange[0]} - ₹{priceRange[1].toLocaleString()}</label>
-              <div style={{display:'flex',gap:10}}>
-                <input type="number" placeholder="Min" value={priceRange[0]} onChange={e=>setPriceRange([Number(e.target.value)||0, priceRange[1]])} style={{flex:1,minHeight:38,padding:'0 12px',border:'1px solid #ece8de',borderRadius:999,background:'#fafaf7',fontSize:12}} />
-                <input type="number" placeholder="Max" value={priceRange[1]} onChange={e=>setPriceRange([priceRange[0], Number(e.target.value)||100000])} style={{flex:1,minHeight:38,padding:'0 12px',border:'1px solid #ece8de',borderRadius:999,background:'#fafaf7',fontSize:12}} />
+              <label className="text- font-bold uppercase text-[#565959] tracking-wide">Price • ₹{priceRange[0].toLocaleString()} - ₹{priceRange[1].toLocaleString()}</label>
+              <div className="flex gap-2 mt-2">
+                <input type="number" value={priceRange[0]} onChange={e=>setPriceRange([Number(e.target.value)||0, priceRange[1]])} placeholder="Min" className="flex-1 h-7 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" />
+                <input type="number" value={priceRange[1]} onChange={e=>setPriceRange([priceRange[0], Number(e.target.value)||100000])} placeholder="Max" className="flex-1 h-7 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" />
               </div>
-              <input type="range" min={0} max={100000} step={500} value={priceRange[1]} onChange={e=>setPriceRange([priceRange[0], Number(e.target.value)])} style={{width:'100%',marginTop:10,accentColor:'#1a1816'}} />
+              <input type="range" min={0} max={100000} step={500} value={priceRange[1]} onChange={e=>setPriceRange([priceRange[0], Number(e.target.value)])} className="w-full mt-3 accent-[#f08804] h-1" />
+              <div className="flex justify-between text- text-[#565959] mt-1"><span>₹0</span><span>₹1L+</span></div>
             </div>
-
-            {/* Sort */}
             <div>
-              <label style={{display:'block',fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8,color:'#8c8881'}}>Sort By</label>
-              <select value={sort} onChange={e=>setSort(e.target.value)} style={{width:'100%',minHeight:42,padding:'0 14px',border:'1px solid #ece8de',borderRadius:999,background:'#fff',fontSize:13,outline:'none'}}>
-                <option value="latest">✨ Latest First</option>
-                <option value="price-low">💰 Price: Low to High</option>
-                <option value="price-high">💎 Price: High to Low</option>
+              <label className="text- font-bold uppercase text-[#565959] tracking-wide">Sort By</label>
+              <select value={sort} onChange={e=>setSort(e.target.value)} className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- bg-white outline-none focus:border-[#e77600]">
+                <option value="latest">Latest First • New Arrivals</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="price-high">Price: High to Low • Premium</option>
               </select>
             </div>
-
-            <div style={{padding:12,background:'#fafaf7',border:'1px dashed #ece8de',borderRadius:12,fontSize:11,lineHeight:1.5,color:'#8c8881'}}>
-              Showing <strong style={{color:'#1a1816'}}>{filteredProducts.length}</strong> of {products.length} products
+            <div className="p-2.5 bg-[#f0f2f2] border border-[#d5d9d9] rounded- text- leading-">
+              Showing <strong>{filteredProducts.length}</strong> of <strong>{products.length}</strong> products<br/>
+              <span className="text-[#067D62]">✓ Prime FREE delivery • EMI • COD • GST invoice</span>
             </div>
           </div>
-        </aside>
+        </div>
 
-        {/* Products */}
         <div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <span style={{fontSize:12,fontWeight:700,padding:'8px 14px',background:'#fff',border:'1px solid #ece8de',borderRadius:999}}>
-                Showing <strong>{filteredProducts.length}</strong> results
-              </span>
-              {category && <span style={{padding:'6px 12px',background:'#1a1816',color:'#fff',borderRadius:999,fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',gap:6}}>{category} <button onClick={()=>setCategory("")} style={{background:'rgba(255,255,255,.2)',border:0,color:'#fff',width:16,height:16,borderRadius:'50%',display:'grid',placeItems:'center',cursor:'pointer'}}>×</button></span>}
-            </div>
-          </div>
-
-          {filteredProducts.length===0 ? (
-            <div style={{textAlign:'center',padding:'80px 32px',background:'#fff',border:'1px solid #ece8de',borderRadius:20}}>
-              <div style={{width:72,height:72,margin:'0 auto 16px',display:'grid',placeItems:'center',background:'#fafaf7',borderRadius:'50%',fontSize:32}}>🔍</div>
-              <h2 style={{margin:'0 0 8px',fontSize:18,fontWeight:900}}>No Products Found</h2>
-              <p style={{margin:'0 0 16px',color:'#8c8881',fontSize:13}}>Try adjusting filters or search terms.</p>
-              {hasFilters && <button onClick={clearFilters} style={{minHeight:40,padding:'0 18px',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontWeight:700,fontSize:13}}>Clear All Filters</button>}
+          {filteredProducts.length===0? (
+            <div className="bg-white border border-[#d5d9d9] rounded- p-10 text-center shadow-sm">
+              <div className="text-">🔍</div>
+              <h2 className="font-bold mt-2 text-">No Products Found for "{search || category}"</h2>
+              <p className="text- text-[#565959] mt-1">Try adjusting filters or search terms. Prime has {products.length} products.</p>
+              {hasFilters && <button onClick={clearFilters} className="mt-3 h-8 px-4 bg-white border border-[#d5d9d9] rounded- text- shadow-sm hover:bg-[#f7fafa]">Clear All Filters • Show {products.length} products</button>}
             </div>
           ) : (
-            <div style={{display:'grid',gridTemplateColumns: viewMode==="grid" ? 'repeat(3,1fr)' : '1fr',gap:16}}>
-              {filteredProducts.map((product, idx)=>{
+            <div className={`grid gap-2 ${viewMode==="grid"? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
+              {filteredProducts.map((product)=>{
                 const stock = Number(product.stock);
-                const hasStock = product.stock===undefined || stock>0;
+                const hasStock = product.stock===undefined || stock>0 || product.in_stock;
                 const isAdding = addingId===product.id;
                 const isWishing = wishId===product.id;
-                const name = product.name || "Product";
-                const cat = product.category_name || product.category || "Product";
                 const price = Number(product.price||0);
-                const mrp = Number(product.original_price || product.mrp || price*1.25);
-                const disc = mrp>price ? Math.round((1-price/mrp)*100) : 0;
-
-                if (viewMode==="list") {
-                  return (
-                    <article key={product.id} style={{display:'grid',gridTemplateColumns:'120px 1fr auto',gap:16,background:'#fff',border:'1px solid #ece8de',borderRadius:16,padding:12,alignItems:'center',animation:`fadeIn .35s both`,animationDelay:`${idx*30}ms`}}>
-                      <Link to={`/products/${product.id}`} style={{width:120,height:120,background:'#fafaf7',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                        {product.image ? <img src={product.image} alt={name} style={{width:'100%',height:'100%',objectFit:'cover'}} /> : <span style={{fontSize:32}}>📦</span>}
-                      </Link>
-                      <div style={{minWidth:0}}>
-                        <span style={{fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'#b8b3a9'}}>{cat}</span>
-                        <h3 style={{margin:'4px 0 6px',fontSize:15,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name}</h3>
-                        <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-                          <span style={{fontSize:16,fontWeight:900}}>₹{price.toLocaleString("en-IN")}</span>
-                          {mrp>price && <><span style={{fontSize:12,color:'#b8b3a9',textDecoration:'line-through'}}>₹{mrp.toLocaleString("en-IN")}</span><span style={{fontSize:10,fontWeight:800,color:'#166534',background:'#f0fdf4',padding:'2px 6px',borderRadius:999}}>{disc}% OFF</span></>}
-                        </div>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                        <Link to={`/products/${product.id}`} style={{minHeight:36,padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:12,fontWeight:700}}>View</Link>
-                        <button disabled={!hasStock || isAdding} onClick={()=>handleAddToCart(product)} style={{minHeight:36,padding:'0 16px',borderRadius:999,background: hasStock ? '#1a1816' : '#f5f2eb',color: hasStock ? '#fff' : '#b8b3a9',border:0,fontSize:12,fontWeight:700,cursor:'pointer'}}>{isAdding ? '...' : 'Add'}</button>
-                      </div>
-                    </article>
-                  );
-                }
-
+                const mrp = Number(product.original_price || product.mrp || product.compare_price || price*1.25);
+                const disc = mrp>price? Math.round((1-price/mrp)*100) : 0;
+                const imgSrc = resolveImg(product.image || product.images?.[0]) || PLACEHOLDER;
                 return (
-                  <article key={product.id} style={{
-                    background:'#fff',border:'1px solid #ece8de',borderRadius:20,overflow:'hidden',
-                    boxShadow:'0 2px 12px rgba(0,0,0,.04)',transition:'.3s cubic-bezier(.16,1,.3,1)',
-                    animation:`fadeIn .4s both`,animationDelay:`${idx*35}ms`,
-                    display:'flex',flexDirection:'column',position:'relative'
-                  }}>
-                    <Link to={`/products/${product.id}`} style={{display:'block',position:'relative'}}>
-                      <div style={{aspectRatio:'1/1',background:'#fafaf7',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative'}}>
-                        {product.image ? <img src={product.image} alt={name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',transition:'.5s'}} /> : <span style={{fontSize:44}}>📦</span>}
-                        {disc>0 && <span style={{position:'absolute',top:12,left:12,padding:'6px 10px',borderRadius:999,background:'#1a1816',color:'#fff',fontSize:10,fontWeight:800,letterSpacing:'.04em',boxShadow:'0 4px 12px rgba(0,0,0,.15)'}}>{disc}% OFF</span>}
-                        <button onClick={(e)=>{e.preventDefault(); handleWishlist(product);}} disabled={isWishing} style={{position:'absolute',top:12,right:12,width:36,height:36,borderRadius:'50%',background:'#fff',border:'1px solid #ece8de',display:'grid',placeItems:'center',fontSize:16,cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,.08)',transition:'.2s'}}>{isWishing ? '...' : '♡'}</button>
-                        {!hasStock && <span style={{position:'absolute',inset:0,background:'rgba(255,255,255,.75)',backdropFilter:'blur(4px)',display:'grid',placeItems:'center',fontSize:12,fontWeight:800,color:'#991b1b'}}>OUT OF STOCK</span>}
-                      </div>
+                  <div key={product.id} className={`bg-white border border-[#d5d9d9] rounded- overflow-hidden shadow-sm flex hover:shadow-[0_2px_8px_rgba(0,0,0,.12)] transition ${viewMode==="list"? 'flex-row' : 'flex-col'}`}>
+                    <Link to={`/product/${product.id}`} className={`relative block bg-[#f7fafa] ${viewMode==="list"? 'w- h- shrink-0' : 'aspect-square'} grid place-items-center border-b md:border-b-0 md:border-r border-[#f0f2f2]`}>
+                      <img src={imgSrc} alt={product.name} className="max-h-full max-w-full object-contain p-2" onError={e=> e.target.src=PLACEHOLDER} />
+                      {disc>0 && <span className="absolute top-2 left-2 bg-[#CC0C39] text-white text- font-bold px-1.5 py-0.5 rounded-">{disc}% OFF • Deal</span>}
+                      <button onClick={(e)=>{e.preventDefault(); handleWishlist(product);}} disabled={isWishing} className="absolute top-2 right-2 w-7 h-7 bg-white border border-[#d5d9d9] rounded-full grid place-items-center text- shadow-sm hover:bg-[#f7fafa] disabled:opacity-50">{isWishing? '...' : '♡'}</button>
+                      {!hasStock && <span className="absolute inset-0 bg-white/80 grid place-items-center text- font-bold text-[#CC0C39]">OUT OF STOCK</span>}
+                      <span className="absolute bottom-1 left-1 bg-white border border-[#d5d9d9] text- px-1 rounded-full">Prime</span>
                     </Link>
-
-                    <div style={{padding:14,display:'flex',flexDirection:'column',gap:8,flex:1}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span style={{fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'#b8b3a9'}}>{cat}</span>
-                        <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:700}}><span style={{width:6,height:6,borderRadius:'50%',background: hasStock ? '#22c55e' : '#ef4444',display:'inline-block'}} />{hasStock ? 'In Stock' : 'Out'}</span>
-                      </div>
-                      <h3 style={{margin:0,fontSize:14,fontWeight:700,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:36}}>{name}</h3>
-                      <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-                        <p style={{margin:0,fontSize:17,fontWeight:900,color:'#1a1816'}}>₹{price.toLocaleString("en-IN")}</p>
-                        {mrp>price && <><span style={{fontSize:11,color:'#b8b3a9',textDecoration:'line-through'}}>₹{mrp.toLocaleString("en-IN")}</span><span style={{fontSize:10,fontWeight:800,color:'#166534'}}>Save ₹{(mrp-price).toLocaleString("en-IN")}</span></>}
-                      </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:'auto',paddingTop:10}}>
-                        <Link to={`/products/${product.id}`} style={{minHeight:40,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:12,fontWeight:700,color:'#1a1816',transition:'.2s'}}>View Details</Link>
-                        <button disabled={!hasStock || isAdding} onClick={()=>handleAddToCart(product)} style={{minHeight:40,borderRadius:999,background: hasStock ? '#1a1816' : '#f5f2eb',color: hasStock ? '#fff' : '#b8b3a9',border:`1px solid ${hasStock ? '#1a1816' : '#ece8de'}`,fontSize:12,fontWeight:800,cursor: hasStock ? 'pointer' : 'not-allowed',opacity: isAdding ? .7 : 1,transition:'.2s',boxShadow: hasStock ? '0 4px 12px rgba(0,0,0,.15)' : 'none'}}>
-                          {isAdding ? 'Adding...' : hasStock ? 'Add to Cart' : 'Out of Stock'}
-                        </button>
+                    <div className="p-3 flex flex-col gap-1 flex-1">
+                      <div className="text- uppercase font-bold text-[#767676] tracking-wide">{product.category_name || product.category?.name || product.category || "ShopZone"} • {product.brand || "ShopZone"}</div>
+                      <Link to={`/product/${product.id}`} className="text- font-medium line-clamp-2 min-h- leading- hover:text-[#C45500] hover:underline">{product.name || "Product"}</Link>
+                      <div className="flex items-center gap-1 text-"><span className="text-[#e47911]">★★★★☆</span><span className="text-[#0066c0]">4.3</span><span className="text-[#565959]">({Math.floor(Math.random()*5000)+100})</span></div>
+                      <div className="flex items-baseline gap-1 mt-1"><span className="font-bold text- text-[#0F1111]">₹{price.toLocaleString("en-IN")}</span>{mrp>price && <span className="text- line-through text-[#565959]">₹{mrp.toLocaleString("en-IN")}</span>}{disc>0 && <span className="text- text-[#CC0C39]">({disc}% off)</span>}</div>
+                      <div className="text- text-[#067D62]">FREE delivery • Prime • 10 days return • EMI</div>
+                      <div className="grid grid-cols-2 gap-1.5 mt-auto pt-2">
+                        <Link to={`/product/${product.id}`} className="h-7 grid place-items-center bg-white border border-[#d5d9d9] rounded- text- shadow-sm hover:bg-[#f7fafa]">View • Prime</Link>
+                        <button disabled={!hasStock || isAdding} onClick={()=>handleAddToCart(product)} className={`h-7 rounded- text- shadow-sm border font-medium ${hasStock? 'bg-[#FFD814] hover:bg-[#F7CA00] border-[#FCD200]' : 'bg-[#f0f2f2] border-[#d5d9d9] text-[#767676] cursor-not-allowed'}`}>{isAdding? 'Adding...' : hasStock? 'Add to Cart' : 'Out of Stock'}</button>
                       </div>
                     </div>
-                  </article>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
-      </section>
-
-      <style>{`
-        @keyframes fadeIn{from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)}}
-        @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.6}}
-        @keyframes slideDown{from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)}}
-        .shop-product-card:hover{transform:translateY(-6px);box-shadow:0 16px 32px rgba(0,0,0,.1) !important;}
-        @media(max-width:1100px){section{grid-template-columns:1fr !important;} aside{position:static !important;}}
-        @media(max-width:640px){div[style*="gridTemplateColumns: repeat(3"]{grid-template-columns:1fr !important;}}
-      `}</style>
-    </main>
+      </div>
+    </div>
   );
 }
 

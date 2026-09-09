@@ -2,6 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getOrder } from "../services/orderService";
 
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/.*$/, "") || "http://127.0.0.1:8000";
+const PLACEHOLDER = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop";
+
+const resolveImg = (product) => {
+  try {
+    if (!product) return "";
+    const src = product.image || product.images?.[0] || product.product_image;
+    if (!src) return "";
+    let s = typeof src === "string"? src : src.image || src.url || src.src || "";
+    if (!s) return "";
+    s = String(s);
+    if (s.startsWith("http")) return s;
+    if (s.startsWith("/media")) return `${BASE}${s}`;
+    return `${BASE}/media/${s.replace(/^\/+/, "")}`;
+  } catch { return ""; }
+};
+
 function OrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
@@ -13,10 +30,10 @@ function OrderDetail() {
     setError("");
     try {
       const data = await getOrder(id);
-      if (!data) throw new Error("Order data was not returned.");
+      if (!data) throw new Error("Order data not returned.");
       setOrder(data);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || "Order load nahi ho paaya.");
+      setError(err.response?.data?.detail || err.message || "Order load failed.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -26,180 +43,178 @@ function OrderDetail() {
 
   if (loading) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'32px 24px'}}>
-        <div style={{maxWidth:1120,margin:'0 auto',display:'flex',flexDirection:'column',gap:16}}>
-          <div style={{height:60,background:'#fff',border:'1px solid #ece8de',borderRadius:16,animation:'pulse 1.5s infinite'}} />
-          <div style={{height:400,background:'#fff',border:'1px solid #ece8de',borderRadius:20,animation:'pulse 1.5s infinite'}} />
+      <div className="bg-[#EAEDED] min-h-screen p-4">
+        <div className="max-w- mx-auto flex flex-col gap-3">
+          <div className="h- bg-white border border-[#d5d9d9] rounded- animate-pulse" />
+          <div className="h- bg-white border border-[#d5d9d9] rounded- animate-pulse" />
         </div>
-      </main>
+      </div>
     );
   }
 
-  if (error || !order) {
+  if (error ||!order) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'40px 24px',display:'grid',placeItems:'center'}}>
-        <div style={{textAlign:'center',padding:40,background:'#fff',border:'1px solid #ece8de',borderRadius:24,maxWidth:420}}>
-          <div style={{width:64,height:64,margin:'0 auto 16px',display:'grid',placeItems:'center',background:'#fef2f2',borderRadius:'50%',fontSize:28}}>⚠️</div>
-          <h2 style={{margin:'0 0 8px',fontWeight:900}}>Unable to Load Order</h2>
-          <p style={{margin:'0 0 20px',color:'#8c8881',fontSize:14}}>{error || "This order does not exist."}</p>
-          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
-            <button onClick={()=>loadOrder()} style={{minHeight:42,padding:'0 20px',borderRadius:999,background:'#1a1816',color:'#fff',border:0,fontWeight:700}}>Try Again</button>
-            <Link to="/orders" style={{minHeight:42,padding:'0 20px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontWeight:700,fontSize:13}}>Back to Orders</Link>
+      <div className="bg-[#EAEDED] min-h-screen p-4 grid place-items-center">
+        <div className="bg-white border border-[#d5d9d9] rounded- p-8 text-center max-w- w-full shadow-sm">
+          <div className="text- mb-3">⚠</div>
+          <h2 className="font-bold text-">Unable to Load Order</h2>
+          <p className="text- text-[#565959] mt-1">{error || "This order does not exist."}</p>
+          <div className="flex gap-2 justify-center mt-4">
+            <button onClick={()=>loadOrder()} className="h-8 px-4 bg-[#FFD814] border border-[#FCD200] rounded- text- shadow-sm font-bold">Try Again</button>
+            <Link to="/orders" className="h-8 px-4 grid place-items-center bg-white border border-[#d5d9d9] rounded- text- shadow-sm">Back to Orders</Link>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
-  const items = Array.isArray(order.items) ? order.items : [];
+  const items = Array.isArray(order.items)? order.items : order.order_items || order.items_detail || [];
   const orderNumber = order.order_number || `#${order.id}`;
-  const status = order.status || "PLACED";
-  const payStatus = order.payment_status || "PENDING";
-  const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "-";
-  const subtotal = Number(order.subtotal || 0);
-  const shippingCost = Number(order.shipping_cost || 0);
-  const totalAmount = Number(order.total_amount || 0);
+  const status = (order.status || "PLACED").toUpperCase();
+  const payStatus = order.payment_status || order.payment?.status || "PENDING";
+  const orderDate = order.created_at? new Date(order.created_at).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "-";
+  const subtotal = Number(order.subtotal || order.items_total || order.total_amount || 0);
+  const shippingCost = Number(order.shipping_cost || order.shipping || 0);
+  const totalAmount = Number(order.total_amount || order.total || subtotal + shippingCost);
 
   const statusMap = {
-    PLACED: {label:'Placed', color:'#3b82f6', bg:'#eff6ff', bd:'#bfdbfe'},
+    PLACED: {label:'Ordered', color:'#3b82f6', bg:'#eff6ff', bd:'#bfdbfe'},
     CONFIRMED: {label:'Confirmed', color:'#8b5cf6', bg:'#f5f3ff', bd:'#ddd6fe'},
-    SHIPPED: {label:'Shipped', color:'#f59e0b', bg:'#fffbeb', bd:'#fde68a'},
-    DELIVERED: {label:'Delivered', color:'#10b981', bg:'#f0fdf4', bd:'#bbf7d0'},
-    CANCELLED: {label:'Cancelled', color:'#ef4444', bg:'#fef2f2', bd:'#fecaca'},
+    PROCESSING: {label:'Processing', color:'#8b5cf6', bg:'#f5f3ff', bd:'#ddd6fe'},
+    SHIPPED: {label:'Shipped', color:'#e47911', bg:'#fef8f2', bd:'#f3a847'},
+    OUT_FOR_DELIVERY: {label:'Out for Delivery', color:'#e47911', bg:'#fef8f2', bd:'#f3a847'},
+    DELIVERED: {label:'Delivered', color:'#067D62', bg:'#f0fdf4', bd:'#bbf7d0'},
+    CANCELLED: {label:'Cancelled', color:'#CC0C39', bg:'#fef2f2', bd:'#fecaca'},
   };
-  const s = statusMap[status.toUpperCase()] || statusMap.PLACED;
-
+  const s = statusMap[status] || statusMap.PLACED;
   const steps = ["PLACED","CONFIRMED","SHIPPED","DELIVERED"];
-  const currentStepIndex = steps.indexOf(status.toUpperCase());
+  const currentStepIndex = Math.max(0, steps.indexOf(status) >=0? steps.indexOf(status) : status==="CANCELLED"? -1 : 0);
 
   return (
-    <main className="order-detail-page" style={{minHeight:'100vh',background:'#fafaf7',padding:'32px 24px'}}>
-      <div className="order-detail-container" style={{maxWidth:1120,margin:'0 auto'}}>
-        {/* Header */}
-        <div className="order-detail-header" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24,flexWrap:'wrap',gap:16}}>
+    <div className="bg-[#EAEDED] min-h-screen py-2">
+      <div className="max-w- mx-auto px-2">
+        <div className="bg-white border border-[#d5d9d9] rounded- p-4 flex justify-between items-start shadow-sm flex-wrap gap-2">
           <div>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
-              <Link to="/orders" style={{width:36,height:36,borderRadius:'50%',background:'#fff',border:'1px solid #ece8de',display:'grid',placeItems:'center'}}>←</Link>
-              <span style={{fontSize:12,fontWeight:700,color:'#8c8881'}}>Orders / {orderNumber}</span>
+            <div className="flex items-center gap-2 text- text-[#0066c0]">
+              <Link to="/orders" className="hover:underline hover:text-[#C45500]">‹ Back to orders</Link>
+              <span className="text-[#565959]">Orders / {orderNumber}</span>
             </div>
-            <h1 style={{margin:'0 0 6px',fontSize:'clamp(26px,4vw,34px)',fontWeight:900,letterSpacing:'-.03em',color:'#1a1816',display:'flex',alignItems:'center',gap:12}}>
+            <h1 className="text- font-medium mt-2 flex items-center gap-2 flex-wrap text-[#0F1111]">
               Order {orderNumber}
-              <span style={{padding:'6px 12px',borderRadius:999,background:s.bg,border:`1px solid ${s.bd}`,color:s.color,fontSize:11,fontWeight:800,letterSpacing:'.04em'}}>{s.label}</span>
+              <span className="text- px-2 py-1 rounded-full font-bold border" style={{background:s.bg, borderColor:s.bd, color:s.color}}>{s.label}</span>
+              {status==="DELIVERED" && <span className="text- px-2 py-0.5 bg-[#067D62] text-white rounded-full">✓ Delivered</span>}
             </h1>
-            <p style={{margin:0,color:'#8c8881',fontSize:13}}>Placed on {orderDate} • {items.length} item{items.length===1?'':'s'}</p>
+            <p className="text- text-[#565959] mt-1">Placed on {orderDate} • {items.length} items • Payment: <span className={payStatus==="PAID"? 'text-[#067D62] font-bold' : 'text-[#e47911]'}>{payStatus}</span> • ID: {order.id}</p>
           </div>
-          <Link to="/orders" style={{minHeight:40,padding:'0 18px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontSize:13,fontWeight:700}}>Back to Orders</Link>
+          <div className="flex gap-2">
+            <Link to="/orders" className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- grid place-items-center shadow-sm hover:bg-[#f7fafa]">All Orders</Link>
+            <button onClick={()=>window.print()} className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- shadow-sm">Print Invoice</button>
+          </div>
         </div>
 
-        {/* Status Timeline */}
-        <div className="order-detail-status" style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:16,marginBottom:24}}>
-          <div style={{background:'#fff',border:'1px solid #ece8de',borderRadius:16,padding:18}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-2">
+          <div className="bg-white border border-[#d5d9d9] rounded- p-4 shadow-sm">
+            <div className="text- font-bold text-[#565959] uppercase mb-3">Order Tracking • Amazon Style</div>
+            <div className="flex justify-between relative">
               {steps.map((step,i)=>{
-                const done = i <= currentStepIndex;
+                const done = currentStepIndex>=0 && i <= currentStepIndex;
                 const active = i === currentStepIndex;
                 return (
-                  <div key={step} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,flex:1,position:'relative'}}>
-                    {i>0 && <div style={{position:'absolute',top:14,left:'-50%',right:'50%',height:2,background: done ? '#10b981' : '#f1eee8',zIndex:0}} />}
-                    <div style={{width:28,height:28,borderRadius:'50%',background: done ? (active ? '#1a1816' : '#10b981') : '#fff',border:`1px solid ${done ? '#10b981' : '#ece8de'}`,color: done ? '#fff' : '#b8b3a9',display:'grid',placeItems:'center',fontSize:12,fontWeight:800,zIndex:1}}>
-                      {done ? (active ? '●' : '✓') : i+1}
+                  <div key={step} className="flex flex-col items-center gap-1.5 flex-1 relative">
+                    {i>0 && <div className="absolute top- left-[-50%] right-[50%] h-" style={{background: done? '#067D62' : '#e7e7e7'}} />}
+                    <div className="w-7 h-7 rounded-full grid place-items-center text- font-bold z-10 border-2" style={{background: done? (active? '#f08804' : '#067D62') : '#fff', borderColor: done? '#067D62' : '#d5d9d9', color: done? '#fff' : '#767676'}}>
+                      {done? '✓' : i+1}
                     </div>
-                    <span style={{fontSize:10,fontWeight:800,letterSpacing:'.06em',color: done ? '#1a1816' : '#b8b3a9',textTransform:'uppercase'}}>{step}</span>
+                    <span className="text- font-bold uppercase tracking-wide" style={{color: done? '#0F1111' : '#767676'}}>{step}</span>
+                    {active && <span className="text- px-1.5 py-0.5 bg-[#f08804] text-white rounded-full animate-pulse">Current</span>}
                   </div>
                 );
               })}
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,paddingTop:12,borderTop:'1px solid #f5f2eb'}}>
-              <span style={{color:'#8c8881'}}>Payment</span>
-              <strong style={{padding:'4px 10px',borderRadius:999,background: payStatus==='PAID' ? '#f0fdf4' : '#fffbeb',border:`1px solid ${payStatus==='PAID' ? '#bbf7d0' : '#fde68a'}`,color: payStatus==='PAID' ? '#166534' : '#92400e',fontSize:11}}>{payStatus}</strong>
-            </div>
+            {status==="CANCELLED" && <div className="mt-3 p-2 bg-[#fef2f2] border border-[#fecaca] rounded- text- text-[#CC0C39] text-center">❌ This order was cancelled • Refund will be processed in 5-7 days</div>}
           </div>
-
-          <div style={{background:'#fff',border:'1px solid #ece8de',borderRadius:16,padding:18}}>
-            <span style={{fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'#b8b3a9'}}>Order Date</span>
-            <strong style={{display:'block',marginTop:6,fontSize:14,color:'#1a1816'}}>{orderDate}</strong>
-            <span style={{fontSize:11,color:'#8c8881',marginTop:4,display:'block'}}>ID: {order.id}</span>
+          <div className="bg-white border border-[#d5d9d9] rounded- p-4 shadow-sm">
+            <div className="text- font-bold uppercase text-[#565959]">Order Date & ID</div>
+            <div className="font-bold text- mt-1 text-[#0F1111]">{orderDate}</div>
+            <div className="text- text-[#767676] mt-1">ID: {order.id} • {orderNumber}</div>
+            <div className="text- text-[#067D62] mt-1">✓ Order confirmed • Invoice sent to email</div>
           </div>
-
-          <div style={{background:'#1a1816',color:'#fff',borderRadius:16,padding:18,position:'relative',overflow:'hidden'}}>
-            <span style={{fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'rgba(255,255,255,.6)'}}>Total Amount</span>
-            <strong style={{display:'block',marginTop:6,fontSize:20,fontWeight:900}}>₹{totalAmount.toLocaleString("en-IN")}</strong>
-            <span style={{fontSize:11,color:'rgba(255,255,255,.6)'}}>{items.length} items • Free delivery</span>
-            <div style={{position:'absolute',width:120,height:120,right:-20,top:-20,background:'radial-gradient(circle,rgba(255,255,255,.12),transparent 70%)'}} />
+          <div className="bg-[#131921] text-white rounded- p-4 shadow-sm">
+            <div className="text- uppercase opacity-70">Total Amount • Prime</div>
+            <div className="text- font-bold mt-1">₹{totalAmount.toLocaleString("en-IN")}.00</div>
+            <div className="text- opacity-70 mt-1">{items.length} items • FREE delivery • EMI from ₹{Math.round(totalAmount/12)}/mo</div>
           </div>
         </div>
 
-        {/* Items */}
-        <section className="order-detail-card" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:24,marginBottom:24,boxShadow:'0 2px 10px rgba(0,0,0,.04)'}}>
-          <h2 style={{margin:'0 0 16px',fontSize:16,fontWeight:900}}>Items ({items.length})</h2>
-          {items.length===0 ? (
-            <div style={{textAlign:'center',padding:40,color:'#8c8881'}}>No items were found in this order.</div>
-          ) : (
-            <div className="order-detail-items" style={{display:'flex',flexDirection:'column',gap:12}}>
-              {items.map((item,idx)=>{
+        <div className="mt-2 bg-white border border-[#d5d9d9] rounded- p-4 shadow-sm">
+          <h2 className="font-bold text-">Items in this order ({items.length}) • Sold by ShopZone • Prime Fulfilled</h2>
+          <div className="mt-3 flex flex-col gap-2">
+            {items.length===0? <div className="text-center py-8 text-[#565959] text-">No items found in this order.</div> :
+              items.map((item)=>{
                 const product = item.product || {};
                 const price = Number(item.price || item.product_price || product.price || 0);
                 const qty = Number(item.quantity || 0);
-                const total = price*qty;
                 const name = item.product_name || product.name || `Product #${item.product}`;
+                const img = resolveImg(product) || resolveImg(item) || PLACEHOLDER;
                 return (
-                  <div key={item.id} className="order-detail-item" style={{display:'grid',gridTemplateColumns:'64px 1fr auto',gap:16,padding:16,background:'#fafaf7',border:'1px solid #f5f2eb',borderRadius:16,alignItems:'center'}}>
-                    <div className="order-item-image" style={{width:64,height:64,background:'#fff',border:'1px solid #ece8de',borderRadius:12,display:'grid',placeItems:'center',fontSize:28}}>
-                      {product.image ? <img src={product.image} alt={name} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}} /> : '📦'}
+                  <div key={item.id || Math.random()} className="grid grid-cols-[72px_1fr_auto] gap-3 p-3 bg-[#f7fafa] border border-[#f0f2f2] rounded- items-center hover:border-[#d5d9d9]">
+                    <Link to={`/product/${product.id || item.product}`} className="w-16 h-16 bg-white border border-[#eaeaea] rounded- grid place-items-center overflow-hidden">
+                      <img src={img} alt={name} className="max-h-full max-w-full object-contain p-1" onError={(e)=> e.target.src=PLACEHOLDER} />
+                    </Link>
+                    <div className="min-w-0">
+                      <Link to={`/product/${product.id || item.product}`} className="text- font-medium truncate hover:text-[#C45500] hover:underline block">{name}</Link>
+                      <div className="text- text-[#565959] mt-0.5">Qty: {qty} • ₹{price.toLocaleString("en-IN")} each • <span className="text-[#067D62]">✓ Prime</span> • Sold by ShopZone</div>
+                      <div className="text- mt-1"><span className="bg-[#067D62] text-white px-1 rounded-">10 days replacement</span> • <span className="text-[#0066c0]">Buy Again</span> • <span className="text-[#0066c0]">Return</span></div>
                     </div>
-                    <div className="order-item-info" style={{minWidth:0}}>
-                      <h3 style={{margin:'0 0 4px',fontSize:14,fontWeight:700,color:'#1a1816',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name}</h3>
-                      <p style={{margin:0,fontSize:12,color:'#8c8881'}}>Qty: {qty} • ₹{price.toLocaleString("en-IN")} each</p>
+                    <div className="text-right">
+                      <div className="font-bold text-">₹{(price*qty).toLocaleString("en-IN")}</div>
+                      <div className="text- text-[#565959]">Inclusive taxes</div>
                     </div>
-                    <strong style={{fontSize:15,fontWeight:800}}>₹{total.toLocaleString("en-IN")}</strong>
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </section>
+              })
+            }
+          </div>
+        </div>
 
-        {/* Grid */}
-        <div className="order-detail-grid" style={{display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:24}}>
-          <section className="order-detail-card" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:24}}>
-            <h2 style={{margin:'0 0 16px',fontSize:16,fontWeight:900,display:'flex',alignItems:'center',gap:8}}>📍 Shipping Details</h2>
-            <div className="shipping-details" style={{display:'flex',flexDirection:'column',gap:10,fontSize:13,lineHeight:1.5}}>
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-[1.2fr_.8fr] gap-2 items-start">
+          <div className="bg-white border border-[#d5d9d9] rounded- p-4 shadow-sm">
+            <h2 className="font-bold text-">📍 Shipping Details • Deliver to</h2>
+            <div className="mt-3 text- space-y-2">
               {[
-                ["Name", order.shipping_name],
+                ["Full Name", order.shipping_name],
                 ["Phone", order.shipping_phone],
                 ["Address", order.shipping_address],
-                ["City", `${order.shipping_city || "-"}, ${order.shipping_state || ""}`],
-                ["Country", `${order.shipping_country || "-"} - ${order.shipping_postal_code || ""}`],
-              ].map(([label,val])=>(
-                <div key={label} style={{display:'grid',gridTemplateColumns:'80px 1fr',gap:12}}>
-                  <span style={{color:'#8c8881',fontWeight:600}}>{label}</span>
-                  <span style={{color:'#1a1816',fontWeight:500}}>{val || "-"}</span>
+                ["City / State", `${order.shipping_city || "-"}, ${order.shipping_state || ""}`],
+                ["Country / Pincode", `${order.shipping_country || "India"} - ${order.shipping_postal_code || ""}`],
+              ].map(([l,v])=>(
+                <div key={l} className="grid grid-cols-[110px_1fr] gap-2 py-1 border-b border-[#f7fafa] last:border-0">
+                  <span className="text-[#565959]">{l}</span>
+                  <span className="font-medium text-[#0F1111]">{v || "-"}</span>
                 </div>
               ))}
-              {order.notes && (
-                <div style={{marginTop:8,padding:12,background:'#fafaf7',border:'1px dashed #ece8de',borderRadius:10}}>
-                  <strong style={{fontSize:11,letterSpacing:'.06em'}}>NOTES</strong>
-                  <p style={{margin:'4px 0 0',color:'#3d3935'}}>{order.notes}</p>
-                </div>
-              )}
+              {order.notes && <div className="mt-3 p-2 bg-[#fef8f2] border border-[#f0e6d8] rounded- text-"><strong>Delivery Instructions:</strong> {order.notes}</div>}
             </div>
-          </section>
-
-          <section className="order-detail-card order-summary-card" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:24,alignSelf:'start',position:'sticky',top:96}}>
-            <h2 style={{margin:'0 0 16px',fontSize:16,fontWeight:900}}>Order Summary</h2>
-            <div style={{display:'flex',flexDirection:'column',gap:0}}>
-              <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #f5f2eb',fontSize:13}}><span style={{color:'#8c8881'}}>Subtotal</span><strong>₹{subtotal.toLocaleString("en-IN")}</strong></div>
-              <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #f5f2eb',fontSize:13}}><span style={{color:'#8c8881'}}>Shipping</span><strong style={{color: shippingCost===0 ? '#10b981' : '#1a1816'}}>{shippingCost===0 ? 'Free ✓' : `₹${shippingCost.toLocaleString("en-IN")}`}</strong></div>
-              <div style={{display:'flex',justifyContent:'space-between',padding:'14px 0',fontSize:15}}><span style={{fontWeight:800}}>Total</span><strong style={{fontWeight:900,fontSize:18}}>₹{totalAmount.toLocaleString("en-IN")}</strong></div>
+            <div className="mt-3 p-2 bg-[#f0f8f0] border border-[#bbf7d0] rounded- text- text-[#067D62]">✓ Address verified • OTP on delivery • Call {order.shipping_phone} before delivery</div>
+          </div>
+          <div className="bg-white border border-[#d5d9d9] rounded- p-4 shadow-sm sticky top-">
+            <h2 className="font-bold text-">Order Summary • Invoice</h2>
+            <div className="mt-3 text- space-y-2">
+              <div className="flex justify-between py-2 border-b border-[#f0f2f2]"><span className="text-[#565959]">Subtotal ({items.length} items)</span><strong>₹{(subtotal || totalAmount).toLocaleString("en-IN")}</strong></div>
+              <div className="flex justify-between py-2 border-b border-[#f0f2f2]"><span className="text-[#565959]">Delivery Charges</span><strong className={shippingCost===0? 'text-[#067D62]' : ''}>{shippingCost===0? 'FREE Prime Delivery' : `₹${shippingCost.toLocaleString("en-IN")}`}</strong></div>
+              <div className="flex justify-between py-3 font-bold text-"><span>Total Amount</span><span className="text-[#C45500]">₹{totalAmount.toLocaleString("en-IN")}</span></div>
+              <div className="text- text-[#565959]">Inclusive of all taxes • EMI available</div>
             </div>
-            <div style={{marginTop:16,padding:10,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,fontSize:11,color:'#166534',fontWeight:600,textAlign:'center'}}>
-              ✓ Order confirmed • Payment {payStatus}
+            <div className="mt-3 p-2 bg-[#f0fdf4] border border-[#bbf7d0] rounded- text- text-[#067D62] text-center">✓ Order confirmed • Payment {payStatus} • Tax invoice sent to email • GST invoice available</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link to="/orders" className="h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white hover:bg-[#f7fafa]">All Orders</Link>
+              <Link to="/products" className="h-8 bg-[#FFD814] border border-[#FCD200] rounded- grid place-items-center text- font-bold">Buy Again • Prime</Link>
             </div>
-          </section>
+            <div className="mt-3 text- text-[#767676] text-center">Need help? <Link to="/help" className="text-[#0066c0] underline">Contact Us</Link> • <Link to="/returns" className="text-[#0066c0] underline">Returns</Link></div>
+          </div>
         </div>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1} 50%{opacity:.6}} @media(max-width:900px){.order-detail-status{grid-template-columns:1fr !important;} .order-detail-grid{grid-template-columns:1fr !important;}}`}</style>
-    </main>
+    </div>
   );
 }
 

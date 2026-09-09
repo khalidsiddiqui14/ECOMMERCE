@@ -20,7 +20,7 @@ function Login() {
     try {
       const data = await loginUser(email, password);
       if (!data?.access) throw new Error("Login succeeded but no access token was returned.");
-      
+
       localStorage.setItem("access_token", data.access);
       if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
 
@@ -29,7 +29,7 @@ function Login() {
         user = await getProfile();
       } catch (profileError) {
         console.error("PROFILE LOAD ERROR:", profileError);
-        setError(profileError.response?.data?.detail || "Login successful, but profile could not be loaded.");
+        setError(profileError.response?.data?.detail || "Login successful, but profile could not be loaded. Try again.");
         return;
       }
 
@@ -42,7 +42,7 @@ function Login() {
       window.dispatchEvent(new Event("auth-change"));
 
       const from = location.state?.from?.pathname;
-      if (user.role === "VENDOR") {
+      if (user.role === "VENDOR" || user.is_vendor || user.role === "vendor") {
         navigate(from || "/vendor/dashboard", { replace: true });
       } else {
         navigate(from || "/", { replace: true });
@@ -54,11 +54,12 @@ function Login() {
       if (err.response?.data) {
         const d = err.response.data;
         if (d.detail) setError(d.detail);
-        else if (d.email) setError(Array.isArray(d.email) ? d.email[0] : d.email);
-        else if (d.password) setError(Array.isArray(d.password) ? d.password[0] : d.password);
-        else setError("Unable to login. Please check your email and password.");
+        else if (d.email) setError(Array.isArray(d.email)? d.email[0] : d.email);
+        else if (d.password) setError(Array.isArray(d.password)? d.password[0] : d.password);
+        else if (d.non_field_errors) setError(Array.isArray(d.non_field_errors)? d.non_field_errors[0] : d.non_field_errors);
+        else setError("Unable to login. Check email and password.");
       } else {
-        setError(err.message || "Unable to connect to the server.");
+        setError(err.message || "Unable to connect to server. Check backend.");
       }
     } finally {
       setLoading(false);
@@ -66,248 +67,117 @@ function Login() {
   };
 
   return (
-    <main className="auth-page" style={{
-      minHeight:'calc(100vh - 76px)',
-      display:'grid',
-      gridTemplateColumns:'1.05fr .95fr',
-      padding:0,
-      background:'#fefefc'
-    }}>
-      {/* Left - Branding */}
-      <div style={{
-        position:'relative',
-        background:'radial-gradient(800px 500px at 20% 10%, #f3f0ff 0%, transparent 60%), radial-gradient(600px 400px at 80% 20%, #fffbeb 0%, transparent 50%), #1a1816',
-        display:'flex',
-        flexDirection:'column',
-        justifyContent:'space-between',
-        padding:'48px',
-        overflow:'hidden',
-        color:'#fff'
-      }}>
-        <div>
-          <Link to="/" style={{display:'inline-flex',alignItems:'center',gap:10,color:'#fff',fontWeight:900,fontSize:20,letterSpacing:'-.04em'}}>
-            <span style={{width:36,height:36,borderRadius:11,background:'#fff',color:'#1a1816',display:'grid',placeItems:'center',fontSize:16}}>E</span>
-            E-Shop
-          </Link>
-        </div>
-
-        <div style={{maxWidth:420}}>
-          <div style={{
-            display:'inline-flex',padding:'6px 12px',background:'rgba(255,255,255,.1)',
-            border:'1px solid rgba(255,255,255,.15)',borderRadius:999,
-            fontSize:11,fontWeight:800,letterSpacing:'.08em',marginBottom:20
-          }}>
-            NEW COLLECTION • 2026
+    <div className="bg-[#EAEDED] min-h-[calc(100vh-104px)] grid place-items-center p-4">
+      <div className="w-full max-w-">
+        <Link to="/" className="flex justify-center mb-4">
+          <div className="text- font-bold tracking-tight">
+            <span className="text-[#131921]">shop</span><span className="text-[#f08804]">zone</span>
+            <span className="text- align-super">.in</span>
           </div>
-          <h1 style={{
-            margin:'0 0 16px',fontFamily:'Instrument Serif, Georgia, serif',
-            fontSize:'clamp(32px,4vw,48px)',lineHeight:.95,letterSpacing:'-.04em',fontWeight:700
-          }}>
-            Welcome back.<br />
-            <span style={{
-              background:'linear-gradient(100deg,#a78bfa,#fbbf24)',
-              WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'
-            }}>
-              We missed you.
-            </span>
-          </h1>
-          <p style={{margin:0,color:'rgba(255,255,255,.65)',lineHeight:1.6,fontSize:15}}>
-            Login to track orders, manage your wishlist, and get early access to drops.
-          </p>
+        </Link>
 
-          <div style={{display:'flex',gap:12,marginTop:32}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <div style={{width:28,height:28,borderRadius:'50%',background:'rgba(255,255,255,.15)',display:'grid',placeItems:'center',fontSize:12}}>✓</div>
-              <span style={{fontSize:13,fontWeight:600,opacity:.9}}>Free shipping ₹999+</span>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <div style={{width:28,height:28,borderRadius:'50%',background:'rgba(255,255,255,.15)',display:'grid',placeItems:'center',fontSize:12}}>✓</div>
-              <span style={{fontSize:13,fontWeight:600,opacity:.9}}>Easy returns</span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{display:'flex',alignItems:'center',gap:12,opacity:.6,fontSize:12}}>
-          <span>© 2026 E-Shop</span>
-          <span>•</span>
-          <span>India • English</span>
-        </div>
-
-        {/* Glow */}
-        <div style={{
-          position:'absolute',width:500,height:500,left:'-10%',bottom:'-10%',
-          background:'radial-gradient(circle,rgba(124,58,237,.35),transparent 70%)',
-          filter:'blur(20px)',pointerEvents:'none'
-        }} />
-      </div>
-
-      {/* Right - Form */}
-      <div style={{
-        display:'flex',alignItems:'center',justifyContent:'center',
-        padding:'40px 24px',background:'#fefefc'
-      }}>
-        <div className="auth-card" style={{
-          width:'min(420px,100%)',padding:0,background:'transparent',border:0,boxShadow:'none'
-        }}>
-          <div className="auth-header" style={{textAlign:'left',marginBottom:28}}>
-            <h1 style={{margin:'0 0 8px',fontSize:30,fontWeight:900,letterSpacing:'-.03em',color:'#1a1816'}}>Welcome Back</h1>
-            <p style={{margin:0,color:'#8c8881',fontSize:14,lineHeight:1.5}}>
-              Login to your E-Shop account to continue shopping.
-            </p>
-          </div>
+        <div className="bg-white border border-[#d5d9d9] rounded- p-6 shadow-sm">
+          <h1 className="text- font-medium text-[#0F1111] mb-4">Sign in</h1>
 
           {error && (
-            <div className="auth-error" role="alert" style={{
-              display:'flex',gap:10,padding:'12px 14px',marginBottom:20,
-              background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,
-              color:'#991b1b',fontSize:13,fontWeight:600,lineHeight:1.5
-            }}>
-              <span style={{flexShrink:0}}>⚠️</span>
-              <span>{error}</span>
+            <div className="mb-4 p-3 border border-[#c40000] bg-[#fff6f6] rounded- text- text-[#c40000] flex gap-2">
+              <span>⚠</span><span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-form" style={{display:'flex',flexDirection:'column',gap:4}}>
-            <div className="form-group" style={{marginBottom:18}}>
-              <label htmlFor="login-email" style={{fontSize:12,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:'#1a1816'}}>
-                Email Address
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label htmlFor="login-email" className="block text- font-bold text-[#0F1111] mb-1">
+                Email or mobile phone number
               </label>
               <input
                 id="login-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="Enter email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 required
                 disabled={loading}
-                style={{
-                  minHeight:48,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,
-                  background:'#fff',outline:'none',transition:'.2s',fontSize:14
-                }}
-                onFocus={(e)=>e.target.style.borderColor='#1a1816'}
-                onBlur={(e)=>e.target.style.borderColor='#ece8de'}
+                className="w-full h-8 px-3 border border-[#a6a6a6] rounded- text- shadow-[0_1px_0_rgba(255,255,255,.5),0_1px_0_rgba(0,0,0,.07)_inset] outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)]"
               />
             </div>
 
-            <div className="form-group" style={{marginBottom:8}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <label htmlFor="login-password" style={{fontSize:12,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',color:'#1a1816'}}>
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="login-password" className="block text- font-bold text-[#0F1111]">
                   Password
                 </label>
-                <Link to="/forgot-password" style={{fontSize:12,fontWeight:700,color:'#8c8881',textDecoration:'underline'}}>Forgot?</Link>
+                <Link to="/forgot-password" className="text- text-[#0066c0] hover:text-[#c45500] hover:underline">Forgot password?</Link>
               </div>
-              <div className="password-field" style={{position:'relative'}}>
+              <div className="relative">
                 <input
                   id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  type={showPassword? "text" : "password"}
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                   required
                   disabled={loading}
-                  className="password-input"
-                  style={{
-                    width:'100%',minHeight:48,padding:'0 48px 0 16px',
-                    border:'1px solid #ece8de',borderRadius:999,
-                    background:'#fff',outline:'none',fontSize:14,transition:'.2s'
-                  }}
-                  onFocus={(e)=>e.target.style.borderColor='#1a1816'}
-                  onBlur={(e)=>e.target.style.borderColor='#ece8de'}
+                  className="w-full h-8 px-3 pr-10 border border-[#a6a6a6] rounded- text- shadow-[0_1px_0_rgba(255,255,255,.5),0_1px_0_rgba(0,0,0,.07)_inset] outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)]"
                 />
                 <button
                   type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword((p) => !p)}
+                  onClick={() => setShowPassword((p) =>!p)}
                   disabled={loading}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  style={{
-                    position:'absolute',right:6,top:6,
-                    width:36,height:36,borderRadius:'50%',
-                    border:'1px solid #ece8de',background:'#fff',
-                    display:'grid',placeItems:'center',fontSize:14,cursor:'pointer'
-                  }}
+                  aria-label={showPassword? "Hide password" : "Show password"}
+                  className="absolute right-1 top-0.5 w-7 h-7 border border-[#d5d9d9] rounded- bg-[#f0f2f2] grid place-items-center text- hover:bg-[#e3e6e6]"
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  {showPassword? "🙈" : "👁"}
                 </button>
               </div>
             </div>
 
             <button
               type="submit"
-              className="auth-button"
               disabled={loading}
-              style={{
-                width:'100%',minHeight:50,marginTop:12,
-                background:'#1a1816',color:'#fff',border:'1px solid #1a1816',
-                borderRadius:999,fontSize:15,fontWeight:800,
-                display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-                boxShadow:'0 8px 20px rgba(0,0,0,.18)',transition:'.25s cubic-bezier(.16,1,.3,1)',
-                opacity: loading ? .7 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
+              className="w-full h-8 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded- text- font-medium shadow-sm disabled:opacity-60"
             >
-              {loading ? (
-                <>
-                  <span style={{
-                    width:16,height:16,border:'2px solid rgba(255,255,255,.3)',
-                    borderTopColor:'#fff',borderRadius:'50%',
-                    display:'inline-block',animation:'spin .8s linear infinite'
-                  }} />
-                  Logging in...
-                </>
-              ) : (
-                <>
-                  Login <span>→</span>
-                </>
-              )}
+              {loading? "Signing in..." : "Sign in"}
             </button>
 
-            <div style={{display:'flex',alignItems:'center',gap:12,margin:'20px 0'}}>
-              <div style={{flex:1,height:1,background:'#ece8de'}} />
-              <span style={{fontSize:11,fontWeight:800,letterSpacing:'.1em',color:'#b8b3a9'}}>OR</span>
-              <div style={{flex:1,height:1,background:'#ece8de'}} />
-            </div>
+            <p className="text- text-[#0F1111] leading-">
+              By continuing, you agree to ShopZone's{" "}
+              <a href="#" className="text-[#0066c0] hover:underline">Conditions of Use</a> and{" "}
+              <a href="#" className="text-[#0066c0] hover:underline">Privacy Notice.</a>
+            </p>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <button type="button" style={{
-                minHeight:44,border:'1px solid #ece8de',borderRadius:999,
-                background:'#fff',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8
-              }}>
-                <span>G</span> Google
-              </button>
-              <button type="button" style={{
-                minHeight:44,border:'1px solid #ece8de',borderRadius:999,
-                background:'#fff',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8
-              }}>
-                <span></span> Apple
-              </button>
+            <div className="flex items-center gap-2 mt-1">
+              <input type="checkbox" id="keep" className="w-3.5 h-3.5 accent-[#e77600]" />
+              <label htmlFor="keep" className="text-">Keep me signed in.</label>
             </div>
           </form>
 
-          <div className="auth-footer" style={{marginTop:24,textAlign:'center'}}>
-            <p style={{margin:0,fontSize:13,color:'#8c8881'}}>
-              Don't have an account?{" "}
-              <Link to="/register" style={{fontWeight:800,color:'#1a1816',textDecoration:'underline'}}>
-                Create Account
-              </Link>
-            </p>
-            <p style={{margin:'12px 0 0',fontSize:11,color:'#b8b3a9',lineHeight:1.5}}>
-              By logging in, you agree to our Terms & Privacy Policy.
-            </p>
+          <div className="mt-4 pt-4 border-t border-[#e7e7e7]">
+            <div className="text- font-bold mb-1">Buying for work?</div>
+            <a href="#" className="text- text-[#0066c0] hover:text-[#c45500] hover:underline">Shop on ShopZone Business</a>
           </div>
         </div>
-      </div>
 
-      <style>{`
-        @keyframes spin { to { transform:rotate(360deg) } }
-        @media(max-width:900px){
-          main.auth-page { grid-template-columns:1fr !important; }
-          main.auth-page > div:first-child { display:none !important; }
-        }
-      `}</style>
-    </main>
+        <div className="mt-6 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#e7e7e7]"></div></div>
+            <div className="relative flex justify-center"><span className="bg-[#EAEDED] px-2 text- text-[#767676]">New to ShopZone?</span></div>
+          </div>
+          <Link to="/register" className="mt-3 block w-full h-9 leading-9 bg-white border border-[#d5d9d9] rounded- text- shadow-sm hover:bg-[#f7fafa] text-center">
+            Create your ShopZone account
+          </Link>
+        </div>
+
+        <div className="mt-8 pt-4 border-t border-[#ddd] text-center text- text-[#767676] space-x-3">
+          <a href="#" className="text-[#0066c0] hover:underline">Conditions of Use</a>
+          <a href="#" className="text-[#0066c0] hover:underline">Privacy Notice</a>
+          <a href="#" className="text-[#0066c0] hover:underline">Help</a>
+          <div className="mt-2">© 1996-2026, ShopZone.com, Inc. or its affiliates • Delhi, India</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

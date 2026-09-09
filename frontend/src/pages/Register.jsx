@@ -29,7 +29,7 @@ function Register() {
 
   const strength = getPasswordStrength(password);
   const match = confirmPassword.length > 0 && password === confirmPassword;
-  const colors = ["#ef4444","#f59e0b","#eab308","#22c55e","#10b981"];
+  const colors = ["#CC0C39","#e47911","#f08804","#067D62","#067D62"];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,16 +37,16 @@ function Register() {
     const u = username.trim();
     const em = email.trim();
     const ph = phone.trim();
-    if (!u) { setError("Please enter a username."); return; }
+    if (!u) { setError("Please enter your name."); return; }
     if (!em) { setError("Please enter your email address."); return; }
     if (password.length < 8) { setError("Password must be at least 8 characters long."); return; }
-    if (strength.score < 3) { setError("Please choose a stronger password. Use uppercase, lowercase, numbers, or special characters."); return; }
+    if (strength.score < 3) { setError("Choose stronger password: uppercase, lowercase, number, symbol."); return; }
     if (!confirmPassword) { setError("Please confirm your password."); return; }
-    if (password !== confirmPassword) { setError("Passwords do not match."); return; }
+    if (password!== confirmPassword) { setError("Passwords do not match."); return; }
     setLoading(true);
     try {
       await registerUser(u, em, password, ph);
-      setSuccess("Account created successfully. Redirecting to login...");
+      setSuccess("Account created! Redirecting to login...");
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
       console.error("REGISTRATION ERROR:", err);
@@ -59,7 +59,7 @@ function Register() {
         }).join(" | ");
         setError(messages || "Registration failed.");
       } else {
-        setError("Unable to connect to the server.");
+        setError(err.message || "Unable to connect to server.");
       }
     } finally {
       setLoading(false);
@@ -67,136 +67,88 @@ function Register() {
   };
 
   return (
-    <main className="auth-page" style={{minHeight:'100vh',display:'grid',gridTemplateColumns:'1.1fr .9fr',background:'#fafaf7'}}>
-      {/* Left - Branding */}
-      <div style={{background:'#1a1816',color:'#fff',padding:'48px 40px',display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative',overflow:'hidden'}}>
-        <div>
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:48}}>
-            <div style={{width:36,height:36,borderRadius:10,background:'#fff',color:'#1a1816',display:'grid',placeItems:'center',fontWeight:900}}>E</div>
-            <span style={{fontWeight:800,letterSpacing:'-.02em'}}>E-SHOP</span>
-            <span style={{marginLeft:8,padding:'4px 8px',borderRadius:999,background:'rgba(255,255,255,.1)',fontSize:10,fontWeight:700}}>JOIN 50K+ USERS</span>
-          </div>
-          <h1 style={{margin:'0 0 16px',fontSize:'clamp(32px,4vw,44px)',fontWeight:900,lineHeight:.95,letterSpacing:'-.04em'}}>Create your<br/>account today.</h1>
-          <p style={{margin:0,color:'rgba(255,255,255,.6)',fontSize:14,lineHeight:1.6,maxWidth:320}}>Join thousands of shoppers. Fast checkout, free delivery, secure payments.</p>
+    <div className="bg-[#EAEDED] min-h-[calc(100vh-104px)] grid place-items-center p-4">
+      <div className="w-full max-w-">
+        <Link to="/" className="flex justify-center mb-4">
+          <div className="text- font-bold tracking-tight"><span className="text-[#131921]">shop</span><span className="text-[#f08804]">zone</span><span className="text- align-super">.in</span></div>
+        </Link>
 
-          <div style={{marginTop:32,display:'flex',flexDirection:'column',gap:14}}>
-            {[
-              {icon:'⚡',t:'Fast Checkout',d:'One-click buy in seconds'},
-              {icon:'🚚',t:'Free Delivery',d:'On orders above ₹999'},
-              {icon:'🔒',t:'Secure & Private',d:'256-bit encrypted'},
-            ].map(f=>(
-              <div key={f.t} style={{display:'flex',gap:12,alignItems:'center'}}>
-                <div style={{width:40,height:40,borderRadius:12,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',display:'grid',placeItems:'center',fontSize:18}}>{f.icon}</div>
-                <div><div style={{fontSize:13,fontWeight:700}}>{f.t}</div><div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>{f.d}</div></div>
+        <div className="bg-white border border-[#d5d9d9] rounded- p-6 shadow-sm">
+          <h1 className="text- font-medium text-[#0F1111] leading-none">Create account</h1>
+
+          {error && <div className="mt-3 p-2.5 border border-[#c40000] bg-[#fff6f6] rounded- text- text-[#c40000] flex gap-2"><span>⚠</span><span>{error}</span></div>}
+          {success && <div className="mt-3 p-2.5 border border-[#067D62] bg-[#f0fdf4] rounded- text- text-[#067D62]">✓ {success}</div>}
+
+          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+            <div>
+              <label className="text- font-bold text-[#0F1111]">Your name</label>
+              <input type="text" placeholder="First and last name" value={username} onChange={e=>setUsername(e.target.value)} autoComplete="name" required disabled={loading}
+                className="w-full h-8 mt-1 px-3 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)] shadow-[0_1px_0_rgba(255,255,255,.5),0_1px_0_rgba(0,0,0,.07)_inset]" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text- font-bold text-[#0F1111]">Mobile number</label>
+                <input type="tel" placeholder="Mobile" value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,"").slice(0,10))} autoComplete="tel" disabled={loading}
+                  className="w-full h-8 mt-1 px-3 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" />
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{display:'flex',alignItems:'center',gap:12,marginTop:24}}>
-          <div style={{display:'flex',marginLeft:8}}>
-            {[1,2,3].map(i=><div key={i} style={{width:32,height:32,borderRadius:'50%',background:'#fff',border:'2px solid #1a1816',marginLeft:-8,display:'grid',placeItems:'center',fontSize:12,fontWeight:800}}>{String.fromCharCode(64+i)}</div>)}
-          </div>
-          <span style={{fontSize:12,color:'rgba(255,255,255,.6)'}}><strong style={{color:'#fff'}}>4.9/5</strong> from 2,400+ reviews</span>
-        </div>
-
-        <div style={{position:'absolute',width:400,height:400,right:-80,bottom:-80,background:'radial-gradient(circle,rgba(255,255,255,.08),transparent 70%)',borderRadius:'50%'}} />
-      </div>
-
-      {/* Right - Form */}
-      <div style={{padding:'32px 24px',display:'grid',placeItems:'center',overflowY:'auto'}}>
-        <div className="auth-card" style={{width:'100%',maxWidth:440,background:'#fff',border:'1px solid #ece8de',borderRadius:24,padding:32,boxShadow:'0 12px 40px rgba(0,0,0,.06)'}}>
-          <div className="auth-header" style={{marginBottom:24}}>
-            <h1 style={{margin:'0 0 6px',fontSize:24,fontWeight:900,letterSpacing:'-.02em',color:'#1a1816'}}>Create Account</h1>
-            <p style={{margin:0,color:'#8c8881',fontSize:13}}>Join E-Shop today — it takes 30 seconds</p>
-          </div>
-
-          {error && <div role="alert" style={{display:'flex',gap:10,padding:'12px 14px',marginBottom:16,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,color:'#991b1b',fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
-          {success && <div role="status" style={{display:'flex',gap:10,padding:'12px 14px',marginBottom:16,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,color:'#166534',fontSize:13,fontWeight:600}}>✓ {success}</div>}
-
-          <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:14}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div className="form-group">
-                <label htmlFor="username" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6,display:'block'}}>Username *</label>
-                <input id="username" type="text" placeholder="rahul_dev" value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" required disabled={loading}
-                  style={{width:'100%',minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:13,background:'#fff'}} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="phone" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6,display:'block'}}>Phone</label>
-                <input id="phone" type="tel" placeholder="+91 98765" value={phone} onChange={e=>setPhone(e.target.value)} autoComplete="tel" disabled={loading}
-                  style={{width:'100%',minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:13,background:'#fff'}} />
+              <div>
+                <label className="text- font-bold text-[#0F1111]">Email</label>
+                <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required disabled={loading}
+                  className="w-full h-8 mt-1 px-3 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" />
               </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="register-email" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6,display:'block'}}>Email *</label>
-              <input id="register-email" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required disabled={loading}
-                style={{width:'100%',minHeight:44,padding:'0 14px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:13,background:'#fff'}} />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="register-password" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6,display:'block'}}>Password *</label>
-              <div style={{position:'relative'}}>
-                <input id="register-password" type={showPassword ? "text" : "password"} placeholder="At least 8 characters" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password" required disabled={loading} minLength={8}
-                  style={{width:'100%',minHeight:44,padding:'0 44px 0 14px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:13,background:'#fff'}} aria-describedby="password-strength" />
-                <button type="button" onClick={()=>setShowPassword(p=>!p)} disabled={loading} style={{position:'absolute',right:5,top:5,width:34,height:34,borderRadius:'50%',border:'1px solid #ece8de',background:'#fff',display:'grid',placeItems:'center',fontSize:14,cursor:'pointer'}}>{showPassword ? "🙈" : "👁"}</button>
+            <div>
+              <label className="text- font-bold text-[#0F1111]">Password</label>
+              <div className="relative mt-1">
+                <input type={showPassword? "text" : "password"} placeholder="At least 8 characters" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password" required disabled={loading} minLength={8}
+                  className="w-full h-8 px-3 pr-9 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)]" />
+                <button type="button" onClick={()=>setShowPassword(p=>!p)} disabled={loading} className="absolute right-1 top-0.5 w-7 h-7 bg-[#f0f2f2] border border-[#d5d9d9] rounded- grid place-items-center text- hover:bg-[#e3e6e6]">{showPassword? "🙈" : "👁"}</button>
               </div>
-
               {password && (
-                <div id="password-strength" style={{marginTop:10}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                    <span style={{fontSize:11,fontWeight:700,color:'#8c8881'}}>Strength: <strong style={{color: colors[strength.score-1] || '#8c8881'}}>{strength.label}</strong></span>
-                    <span style={{fontSize:11,fontWeight:800}}>{strength.score}/5</span>
-                  </div>
-                  <div style={{display:'flex',gap:4,marginBottom:8}}>
-                    {[1,2,3,4,5].map(lvl=>(
-                      <div key={lvl} style={{flex:1,height:6,borderRadius:999,background: lvl<=strength.score ? colors[strength.score-1] : '#f1eee8',transition:'.3s'}} />
-                    ))}
-                  </div>
-                  <span style={{fontSize:10,color:'#8c8881',lineHeight:1.4}}>Use 8+ characters with uppercase, lowercase, numbers, and symbols.</span>
+                <div className="mt-2">
+                  <div className="flex justify-between text-"><span>Strength: <strong style={{color: colors[strength.score-1] || "#565959"}}>{strength.label || "Too short"}</strong></span><span className="text-[#565959]">{strength.score}/5</span></div>
+                  <div className="flex gap-1 mt-1">{[1,2,3,4,5].map(lvl=><div key={lvl} className="flex-1 h-1.5 rounded-full transition" style={{background: lvl<=strength.score? colors[strength.score-1] : '#e7e7e7'}} />)}</div>
+                  <div className="text- text-[#767676] mt-1">Use 8+ chars: uppercase, lowercase, number, symbol (!@#$%).</div>
                 </div>
               )}
             </div>
 
-            <div className="form-group">
-              <label htmlFor="confirm-password" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6,display:'block'}}>Confirm Password *</label>
-              <div style={{position:'relative'}}>
-                <input id="confirm-password" type={showConfirm ? "text" : "password"} placeholder="Re-enter password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required disabled={loading} minLength={8}
-                  style={{width:'100%',minHeight:44,padding:'0 44px 0 14px',border:`1px solid ${confirmPassword ? (match ? '#bbf7d0' : '#fecaca') : '#ece8de'}`,borderRadius:999,outline:'none',fontSize:13,background: confirmPassword ? (match ? '#f0fdf4' : '#fef2f2') : '#fff'}} aria-describedby="password-match" />
-                <button type="button" onClick={()=>setShowConfirm(p=>!p)} disabled={loading} style={{position:'absolute',right:5,top:5,width:34,height:34,borderRadius:'50%',border:'1px solid #ece8de',background:'#fff',display:'grid',placeItems:'center',fontSize:14,cursor:'pointer'}}>{showConfirm ? "🙈" : "👁"}</button>
+            <div>
+              <label className="text- font-bold text-[#0F1111]">Re-enter password</label>
+              <div className="relative mt-1">
+                <input type={showConfirm? "text" : "password"} placeholder="Re-enter password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required disabled={loading} minLength={8}
+                  className={`w-full h-8 px-3 pr-9 border rounded- text- outline-none shadow-[0_1px_0_rgba(255,255,255,.5),0_1px_0_rgba(0,0,0,.07)_inset] ${confirmPassword? (match? 'border-[#067D62] bg-[#f0fdf4] focus:border-[#067D62]' : 'border-[#c40000] bg-[#fff6f6] focus:border-[#c40000]') : 'border-[#a6a6a6] focus:border-[#e77600]'}`} />
+                <button type="button" onClick={()=>setShowConfirm(p=>!p)} disabled={loading} className="absolute right-1 top-0.5 w-7 h-7 bg-[#f0f2f2] border border-[#d5d9d9] rounded- grid place-items-center text- hover:bg-[#e3e6e6]">{showConfirm? "🙈" : "👁"}</button>
               </div>
-              {confirmPassword && (
-                <span id="password-match" style={{marginTop:6,display:'inline-flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color: match ? '#166534' : '#991b1b',padding:'4px 8px',borderRadius:999,background: match ? '#f0fdf4' : '#fef2f2',border:`1px solid ${match ? '#bbf7d0' : '#fecaca'}`}}>
-                  {match ? '✓ Match' : '✕ No match'}
-                </span>
-              )}
+              {confirmPassword && <div className={`mt-1 text- font-medium ${match? 'text-[#067D62]' : 'text-[#c40000]'}`}>{match? '✓ Passwords match • Strong account' : '✕ Passwords do not match'}</div>}
             </div>
 
-            <button type="submit" disabled={loading} style={{
-              minHeight:48,borderRadius:999,background:'#1a1816',color:'#fff',border:'1px solid #1a1816',
-              fontWeight:800,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-              boxShadow:'0 8px 20px rgba(0,0,0,.18)',opacity: loading ? .7 : 1,cursor: loading ? 'not-allowed' : 'pointer',marginTop:6
-            }}>
-              {loading ? (
-                <>
-                  <span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}} />
-                  Creating Account...
-                </>
-              ) : 'Create Account →'}
+            <button type="submit" disabled={loading} className="mt-2 h-8 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded- text- font-medium shadow-sm disabled:opacity-50">
+              {loading? "Creating account..." : "Create your ShopZone account"}
             </button>
 
-            <div style={{textAlign:'center',fontSize:11,color:'#b8b3a9',lineHeight:1.4,marginTop:4}}>
-              By creating an account, you agree to our <strong style={{color:'#1a1816'}}>Terms</strong> & <strong style={{color:'#1a1816'}}>Privacy</strong>
-            </div>
+            <p className="text- leading- text-[#0F1111]">By creating an account, you agree to ShopZone's <a href="#" className="text-[#0066c0] hover:underline">Conditions of Use</a> and <a href="#" className="text-[#0066c0] hover:underline">Privacy Notice.</a> Prime FREE delivery, EMI, COD.</p>
           </form>
 
-          <div className="auth-footer" style={{marginTop:20,paddingTop:16,borderTop:'1px solid #f5f2eb',textAlign:'center'}}>
-            <p style={{margin:0,fontSize:13,color:'#8c8881'}}>Already have an account? <Link to="/login" style={{fontWeight:800,color:'#1a1816',textDecoration:'underline'}}>Login →</Link></p>
+          <div className="mt-4 pt-4 border-t border-[#e7e7e7] text- text-[#0F1111]">
+            Already have an account? <Link to="/login" className="text-[#0066c0] hover:text-[#c45500] hover:underline font-medium">Sign in →</Link>
+          </div>
+
+          <div className="mt-3 text- text-[#565959] bg-[#f7fafa] border border-[#f0f2f2] rounded- p-2">
+            <b>Prime benefit:</b> FREE One-Day Delivery • 10 days return • Pay on Delivery • ShopZone Business
           </div>
         </div>
+
+        <div className="mt-6 text-center text- text-[#767676] space-x-3">
+          <a href="#" className="text-[#0066c0] hover:underline">Conditions of Use</a>
+          <a href="#" className="text-[#0066c0] hover:underline">Privacy Notice</a>
+          <a href="#" className="text-[#0066c0] hover:underline">Help</a>
+          <div className="mt-2">© 1996-2026, ShopZone.com, Inc. or its affiliates • Delhi, India • Prime</div>
+        </div>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @media(max-width:900px){main{grid-template-columns:1fr !important;} main > div:first-child{display:none !important;}}`}</style>
-    </main>
+    </div>
   );
 }
 

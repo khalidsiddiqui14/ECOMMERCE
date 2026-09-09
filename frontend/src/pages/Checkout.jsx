@@ -1,7 +1,23 @@
-import { useState } from "react";
+  import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createOrder } from "../services/orderService";
-import { createPayment } from "../services/paymentService";
+import { createPayment, initiateRazorpay } from "../services/paymentService";
+import { getCart } from "../services/cartService";
+import { getAddresses } from "../services/userService";
+
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/.*$/, "") || "http://127.0.0.1:8000";
+
+const getImg = (p) => {
+  try {
+    const img = p?.images?.[0] || p?.image;
+    let s = typeof img === "string"? img : img?.image || p?.image || "";
+    if (!s) return "https://via.placeholder.com/60";
+    s = String(s);
+    if (s.startsWith("http")) return s;
+    if (s.startsWith("/media")) return `${BASE}${s}`;
+    return `${BASE}/media/${s.replace(/^\/+/, "")}`;
+  } catch { return "https://via.placeholder.com/60"; }
+};
 
 function Checkout() {
   const navigate = useNavigate();
@@ -11,204 +27,265 @@ function Checkout() {
   });
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [loading, setLoading] = useState(false);
+  const [cartLoading, setCartLoading] = useState(true);
+  const [cartItems, setCartItems] = useState([]);
+  const [subtotal, setSubtotal] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      setCartLoading(true);
+      try {
+        const [cartData, addrData] = await Promise.allSettled([getCart(), getAddresses()]);
+        if (cartData.status==="fulfilled") {
+          const items = Array.isArray(cartData.value?.items)? cartData.value.items : cartData.value?.cart_items || [];
+          setCartItems(items);
+          const total = items.reduce((t,it)=>{
+            const p = it.product || {};
+            const price = Number(it.price?? p.price?? 0);
+            return t + price * Number(it.quantity||0);
+          },0);
+          setSubtotal(total);
+        }
+        if (addrData.status==="fulfilled") {
+          const d = addrData.value;
+          const list = Array.isArray(d)? d : d?.results || d?.addresses || [];
+          setSavedAddresses(Array.isArray(list)? list : []);
+          const def = list.find(a=>a.is_default);
+          if (def) {
+            setSelectedAddressId(def.id);
+            setForm({
+              shipping_name: def.name || "",
+              shipping_phone: def.phone || "",
+              shipping_address: `${def.address||""} ${def.locality||""}`.trim(),
+              shipping_city: def.city || "",
+              shipping_state: def.state || "",
+              shipping_country: "India",
+              shipping_postal_code: def.pincode || "",
+              notes: "",
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Checkout load failed", e);
+      } finally {
+        setCartLoading(false);
+      }
+    })();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(p => ({ ...p, [name]: value }));
+    setForm(p => ({...p, [name]: value }));
     if (error) setError("");
+    setSelectedAddressId(null);
   };
 
-  const formatError = (err) => {
-    const data = err.response?.data;
-    if (!data) return err.message || "Order ya payment create nahi ho paaya.";
-    if (data.missing_fields) {
-      if (typeof data.missing_fields === "string") return data.missing_fields;
-      return Object.entries(data.missing_fields).map(([f,m])=>`${f}: ${Array.isArray(m)?m.join(", "):m}`).join(" | ");
-    }
-    if (data.detail) return typeof data.detail==="string" ? data.detail : JSON.stringify(data.detail);
-    const entries = Object.entries(data);
-    if (entries.length>0) return entries.map(([f,m])=>`${f}: ${Array.isArray(m)?m.join(", "):typeof m==="object"?JSON.stringify(m):m}`).join(" | ");
-    return "Checkout failed. Please try again.";
+  const selectAddress = (addr) => {
+    setSelectedAddressId(addr.id);
+    setForm({
+      shipping_name: addr.name || "",
+      shipping_phone: addr.phone || "",
+      shipping_address: `${addr.address||""} ${addr.locality||""}`.trim(),
+      shipping_city: addr.city || "",
+      shipping_state: addr.state || "",
+      shipping_country: "India",
+      shipping_postal_code: addr.pincode || "",
+      notes: form.notes,
+    });
   };
 
   const validateForm = () => {
-    const req = [["shipping_name","Full name"],["shipping_phone","Phone"],["shipping_address","Address"],["shipping_city","City"],["shipping_state","State"],["shipping_country","Country"],["shipping_postal_code","Postal code"]];
+    const req = [["shipping_name","Full name"],["shipping_phone","Phone"],["shipping_address","Address"],["shipping_city","City"],["shipping_state","State"],["shipping_postal_code","Postal code"]];
     for (const [field,label] of req) {
-      if (!form[field].trim()) { setError(`${label} is required.`); return false; }
+      if (!form[field]?.trim()) { setError(`${label} is required.`); return false; }
     }
-    if (form.shipping_phone.trim().length < 10) { setError("Please enter a valid phone number."); return false; }
-    if (form.shipping_postal_code.trim().length < 4) { setError("Please enter a valid postal code."); return false; }
+    if (form.shipping_phone.replace(/\D/g,"").length < 10) { setError("Enter valid 10-digit phone."); return false; }
+    if (form.shipping_postal_code.replace(/\D/g,"").length < 4) { setError("Enter valid postal code."); return false; }
     return true;
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (loading) return;
     setError(""); setSuccess("");
     if (!validateForm()) return;
+    if (cartItems.length===0) { setError("Your cart is empty. Add products first."); return; }
     setLoading(true);
     try {
-      const cleaned = Object.fromEntries(Object.entries(form).map(([k,v])=>[k, v.trim()]));
-      const order = await createOrder(cleaned);
-      if (!order?.id) throw new Error("Order was created but no order ID was returned.");
-      await createPayment(order.id, paymentMethod);
-      setSuccess(`Order #${order.id} placed successfully.`);
-      navigate("/orders", { replace: true });
+      const cleaned = Object.fromEntries(Object.entries(form).map(([k,v])=>[k, (v||"").trim()]));
+      const order = await createOrder({...cleaned, payment_method: paymentMethod});
+      if (!order?.id) throw new Error("Order ID not returned");
+
+      if (paymentMethod==="RAZORPAY" || paymentMethod==="UPI") {
+        try {
+          await initiateRazorpay(order.id, subtotal);
+        } catch (payErr) {
+          console.warn("Razorpay init failed, but order created", payErr);
+          // Still go to orders, user can pay later
+        }
+      } else {
+        try { await createPayment(order.id, paymentMethod); } catch {}
+      }
+
+      setSuccess(`Order #${order.id} placed!`);
+      window.dispatchEvent(new Event("cart-change"));
+      navigate(`/orders/${order.id}`, { replace: true });
     } catch (err) {
-      console.error("CHECKOUT ERROR:", err);
-      setError(formatError(err));
+      const data = err.response?.data;
+      let msg = err.message || "Checkout failed";
+      if (data?.missing_fields) {
+        if (typeof data.missing_fields==="string") msg = data.missing_fields;
+        else msg = Object.entries(data.missing_fields).map(([f,m])=>`${f}: ${Array.isArray(m)?m.join(", "):m}`).join(" | ");
+      } else if (data?.detail) msg = typeof data.detail==="string"? data.detail : JSON.stringify(data.detail);
+      else if (data) msg = Object.entries(data).map(([f,m])=>`${f}: ${Array.isArray(m)?m.join(", "):m}`).join(" | ");
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const totalItems = cartItems.reduce((t,it)=> t + Number(it.quantity||0),0);
+  const codFee = paymentMethod==="COD"? 49 : 0;
+  const finalTotal = subtotal + codFee;
+
   return (
-    <main className="checkout-page" style={{minHeight:'100vh',background:'#fafaf7',padding:'32px 24px'}}>
-      <div className="checkout-container" style={{maxWidth:1120,margin:'0 auto'}}>
-        {/* Header */}
-        <div className="checkout-header" style={{marginBottom:28}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
-            <Link to="/cart" style={{width:36,height:36,borderRadius:'50%',background:'#fff',border:'1px solid #ece8de',display:'grid',placeItems:'center',fontSize:14}}>←</Link>
-            <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:700,color:'#8c8881'}}>
-              <span style={{color:'#1a1816'}}>Cart</span><span>→</span><span style={{color:'#1a1816',fontWeight:800}}>Checkout</span><span>→</span><span>Orders</span>
-            </div>
-          </div>
-          <h1 style={{margin:'0 0 8px',fontSize:'clamp(28px,4vw,36px)',fontWeight:900,letterSpacing:'-.03em',color:'#1a1816'}}>Checkout</h1>
-          <p style={{margin:0,color:'#8c8881',fontSize:14}}>Enter your shipping information and choose your payment method.</p>
+    <div className="bg-[#EAEDED] min-h-screen py-2">
+      <div className="max-w- mx-auto">
+        <div className="bg-white border-b border-[#d5d9d9] h- flex items-center px-4 sticky top-0 z-10 shadow-sm">
+          <Link to="/" className="text- font-bold">shop<span className="text-[#f08804]">zone</span></Link>
+          <div className="ml-8 text- font-medium">Checkout ({totalItems} {totalItems===1? 'item':'items'})</div>
+          <div className="ml-auto flex items-center gap-2 text- text-[#565959]"><span className="text-">🔒</span> Secure checkout</div>
         </div>
 
-        {error && (
-          <div role="alert" style={{display:'flex',gap:10,padding:'12px 14px',marginBottom:20,background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,color:'#991b1b',fontSize:13,fontWeight:600}}>
-            <span>⚠️</span> {error}
-          </div>
-        )}
-        {success && (
-          <div role="status" style={{display:'flex',gap:10,padding:'12px 14px',marginBottom:20,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,color:'#166534',fontSize:13,fontWeight:600}}>
-            <span>✓</span> {success}
-          </div>
-        )}
+        {error && <div className="m-2 bg-white border-l- border-[#c40000] p-3 text- text-[#c40000] shadow-sm rounded-">⚠ {error}</div>}
+        {success && <div className="m-2 bg-white border-l- border-[#067D62] p-3 text- text-[#067D62] shadow-sm rounded-">✓ {success}</div>}
 
-        <div className="checkout-layout" style={{display:'grid',gridTemplateColumns:'1fr 380px',gap:24,alignItems:'start'}}>
-          {/* Form */}
-          <section className="checkout-card" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:28,boxShadow:'0 2px 10px rgba(0,0,0,.04)'}}>
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="checkout-section">
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:'#1a1816',color:'#fff',display:'grid',placeItems:'center',fontSize:12,fontWeight:800}}>1</div>
-                  <h2 style={{margin:0,fontSize:16,fontWeight:800}}>Shipping Information</h2>
-                </div>
-
-                <div className="checkout-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
-                  <div className="form-group">
-                    <label htmlFor="shipping_name" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Full Name *</label>
-                    <input id="shipping_name" name="shipping_name" type="text" placeholder="Rahul Sharma" value={form.shipping_name} onChange={handleChange} disabled={loading} required
-                      style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14,transition:'.2s'}} />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-2 p-2 items-start">
+          <div className="bg-white border border-[#d5d9d9] rounded- shadow-sm">
+            <form onSubmit={handleSubmit} noValidate className="p-5">
+              {savedAddresses.length>0 && (
+                <div className="mb-6">
+                  <h2 className="text- font-bold text-[#C45500] mb-2">1 Your Addresses</h2>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {savedAddresses.slice(0,4).map(addr=>(
+                      <div key={addr.id} onClick={()=>selectAddress(addr)} className={`p-3 border rounded- cursor-pointer text- ${selectedAddressId===addr.id? 'border-[#e77600] bg-[#fef8f2] ring-1 ring-[#e77600]' : 'border-[#d5d9d9] hover:border-[#e77600]'}`}>
+                        <div className="font-bold">{addr.name} • {addr.address_type}</div>
+                        <div className="mt-1 leading-">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</div>
+                        <div className="mt-1 text-[#0066c0] text-">{selectedAddressId===addr.id? '✓ Selected • Deliver to this address' : 'Deliver to this address'}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="shipping_phone" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Phone *</label>
-                    <input id="shipping_phone" name="shipping_phone" type="tel" placeholder="+91 98765 43210" value={form.shipping_phone} onChange={handleChange} disabled={loading} required
-                      style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14}} />
+                  <Link to="/addresses" className="inline-block mt-2 text- text-[#0066c0] hover:underline">+ Add new address / Manage addresses</Link>
+                  <hr className="mt-4" />
+                </div>
+              )}
+
+              <div className="mb-6">
+                <h2 className="text- font-bold text-[#C45500] mb-3">1 {savedAddresses.length>0? 'Or enter new' : ''} Shipping address</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text- font-bold">Full name *</label>
+                    <input name="shipping_name" value={form.shipping_name} onChange={handleChange} required disabled={loading} placeholder="Rahul Sharma"
+                      className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,.5)] outline-none" />
                   </div>
-                </div>
-
-                <div className="form-group" style={{marginBottom:16}}>
-                  <label htmlFor="shipping_address" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Address *</label>
-                  <textarea id="shipping_address" name="shipping_address" rows={3} placeholder="House no, street, area" value={form.shipping_address} onChange={handleChange} disabled={loading} required
-                    style={{width:'100%',padding:'12px 16px',border:'1px solid #ece8de',borderRadius:16,outline:'none',fontSize:14,resize:'none'}} />
-                </div>
-
-                <div className="checkout-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-                  <div className="form-group"><label htmlFor="shipping_city" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>City *</label>
-                    <input id="shipping_city" name="shipping_city" type="text" placeholder="Delhi" value={form.shipping_city} onChange={handleChange} disabled={loading} required style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14}} /></div>
-                  <div className="form-group"><label htmlFor="shipping_state" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>State *</label>
-                    <input id="shipping_state" name="shipping_state" type="text" placeholder="Delhi" value={form.shipping_state} onChange={handleChange} disabled={loading} required style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14}} /></div>
-                  <div className="form-group"><label htmlFor="shipping_country" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Country *</label>
-                    <input id="shipping_country" name="shipping_country" type="text" value={form.shipping_country} onChange={handleChange} disabled={loading} required style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14}} /></div>
-                  <div className="form-group"><label htmlFor="shipping_postal_code" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Postal Code *</label>
-                    <input id="shipping_postal_code" name="shipping_postal_code" type="text" placeholder="110001" value={form.shipping_postal_code} onChange={handleChange} disabled={loading} required style={{width:'100%',minHeight:46,padding:'0 16px',border:'1px solid #ece8de',borderRadius:999,outline:'none',fontSize:14}} /></div>
-                </div>
-
-                <div className="form-group" style={{marginTop:16}}>
-                  <label htmlFor="notes" style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8,display:'block'}}>Order Notes <span style={{textTransform:'none',fontWeight:400,color:'#b8b3a9'}}>(Optional)</span></label>
-                  <textarea id="notes" name="notes" rows={2} placeholder="Delivery instructions..." value={form.notes} onChange={handleChange} disabled={loading}
-                    style={{width:'100%',padding:'12px 16px',border:'1px solid #ece8de',borderRadius:16,outline:'none',fontSize:14,resize:'none'}} />
+                  <div>
+                    <label className="text- font-bold">Phone number *</label>
+                    <input name="shipping_phone" value={form.shipping_phone} onChange={handleChange} required disabled={loading} placeholder="9876543210"
+                      className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text- font-bold">Address (House, Street, Area) *</label>
+                    <textarea name="shipping_address" value={form.shipping_address} onChange={handleChange} required disabled={loading} rows={2} placeholder="House no, street, area, landmark"
+                      className="w-full mt-1 p-2 border border-[#a6a6a6] rounded- text- outline-none resize-none focus:border-[#e77600]" />
+                  </div>
+                  <div><label className="text- font-bold">City *</label><input name="shipping_city" value={form.shipping_city} onChange={handleChange} required disabled={loading} placeholder="Delhi" className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" /></div>
+                  <div><label className="text- font-bold">State *</label><input name="shipping_state" value={form.shipping_state} onChange={handleChange} required disabled={loading} placeholder="Delhi" className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- outline-none" /></div>
+                  <div><label className="text- font-bold">Country *</label><input name="shipping_country" value={form.shipping_country} onChange={handleChange} required disabled={loading} className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- outline-none" /></div>
+                  <div><label className="text- font-bold">Postal code *</label><input name="shipping_postal_code" value={form.shipping_postal_code} onChange={handleChange} required disabled={loading} placeholder="110059" className="w-full h-8 mt-1 px-2 border border-[#a6a6a6] rounded- text- outline-none focus:border-[#e77600]" /></div>
+                  <div className="md:col-span-2"><label className="text- font-bold">Order notes (Optional)</label><textarea name="notes" value={form.notes} onChange={handleChange} disabled={loading} rows={2} placeholder="Delivery instructions, e.g. Leave at door" className="w-full mt-1 p-2 border border-[#a6a6a6] rounded- text- outline-none resize-none" /></div>
                 </div>
               </div>
 
-              <div className="checkout-section" style={{marginTop:32,paddingTop:24,borderTop:'1px solid #f5f2eb'}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:'#1a1816',color:'#fff',display:'grid',placeItems:'center',fontSize:12,fontWeight:800}}>2</div>
-                  <h2 style={{margin:0,fontSize:16,fontWeight:800}}>Payment Method</h2>
-                </div>
-
-                <div className="payment-methods" style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div className="pt-5 border-t border-[#eaeaea]">
+                <h2 className="text- font-bold text-[#C45500] mb-3">2 Payment method • Select a payment method</h2>
+                <div className="space-y-2">
                   {[
-                    {id:'COD', title:'Cash on Delivery', desc:'Pay when your order arrives.', icon:'💵', badge:'Most Popular'},
-                    {id:'UPI', title:'UPI / Wallet', desc:'Pay via GPay, PhonePe, Paytm', icon:'📱', badge:'Instant'},
+                    {id:'COD', title:'Cash on Delivery / Pay on Delivery', desc:'Cash, UPI, Cards accepted. ₹49 fee. Pay when delivered.', icon:'💵', fee:49},
+                    {id:'RAZORPAY', title:'Razorpay • Cards, UPI, NetBanking, Wallet', desc:'Visa, Mastercard, Rupay, GPay, PhonePe, Paytm • Secure', icon:'💳', fee:0},
+                    {id:'UPI', title:'UPI • GPay, PhonePe, Paytm, BHIM', desc:'Instant payment • No extra fee', icon:'📱', fee:0},
                   ].map(m=>(
-                    <label key={m.id} className="payment-option" style={{
-                      display:'flex',alignItems:'center',gap:14,padding:16,
-                      border:`1px solid ${paymentMethod===m.id ? '#1a1816' : '#ece8de'}`,
-                      background: paymentMethod===m.id ? '#fafaf7' : '#fff',
-                      borderRadius:16,cursor:'pointer',transition:'.2s'
-                    }}>
-                      <input type="radio" name="payment_method" value={m.id} checked={paymentMethod===m.id} onChange={e=>setPaymentMethod(e.target.value)} disabled={loading} style={{width:18,height:18,accentColor:'#1a1816'}} />
-                      <div style={{width:44,height:44,borderRadius:12,background:'#fff',border:'1px solid #ece8de',display:'grid',placeItems:'center',fontSize:20}}>{m.icon}</div>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <strong style={{fontSize:14}}>{m.title}</strong>
-                          <span style={{padding:'2px 8px',borderRadius:999,background:'#1a1816',color:'#fff',fontSize:10,fontWeight:800}}>{m.badge}</span>
-                        </div>
-                        <span style={{fontSize:12,color:'#8c8881'}}>{m.desc}</span>
+                    <label key={m.id} className={`flex items-start gap-3 p-3 border rounded- cursor-pointer ${paymentMethod===m.id? 'border-[#e77600] bg-[#fef8f2] shadow-[0_0_0_1px_#e77600]' : 'border-[#d5d9d9] hover:border-[#a6a6a6]'}`}>
+                      <input type="radio" name="payment_method" value={m.id} checked={paymentMethod===m.id} onChange={e=>setPaymentMethod(e.target.value)} disabled={loading} className="mt-1 accent-[#e77600]" />
+                      <div className="flex-1">
+                        <div className="text- font-bold flex items-center gap-2">{m.title} {m.fee>0 && <span className="text- bg-[#f0f2f2] border px-1 rounded">₹{m.fee} fee</span>}</div>
+                        <div className="text- text-[#565959] mt-0.5">{m.desc}</div>
                       </div>
-                      {paymentMethod===m.id && <span style={{color:'#10b981',fontWeight:800}}>✓</span>}
+                      <span className="text-">{m.icon}</span>
                     </label>
                   ))}
                 </div>
+                <div className="mt-3 text- text-[#565959] bg-[#f7fafa] border border-[#d5d9d9] p-2 rounded-">🔒 Your payment is secure • ShopZone uses Razorpay • 256-bit SSL • EMI available on cards • COD: Keep exact change ready</div>
               </div>
 
-              <div className="checkout-actions" style={{display:'flex',gap:12,marginTop:28}}>
-                <Link to="/cart" style={{flex:1,minHeight:48,display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid #ece8de',borderRadius:999,background:'#fff',fontWeight:700,fontSize:14,opacity: loading ? .6 : 1,pointerEvents: loading ? 'none' : 'auto'}}>
-                  ← Back to Cart
-                </Link>
-                <button type="submit" disabled={loading} style={{
-                  flex:1.5,minHeight:48,borderRadius:999,background:'#1a1816',color:'#fff',border:'1px solid #1a1816',
-                  fontWeight:800,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-                  boxShadow:'0 8px 20px rgba(0,0,0,.18)',opacity: loading ? .7 : 1,cursor: loading ? 'not-allowed' : 'pointer'
-                }}>
-                  {loading ? (
-                    <>
-                      <span style={{width:16,height:16,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}} />
-                      Placing Order...
-                    </>
-                  ) : 'Place Order →'}
+              <div className="flex gap-3 mt-6">
+                <Link to="/cart" className="flex-1 h-9 grid place-items-center bg-white border border-[#d5d9d9] rounded- text- shadow-sm hover:bg-[#f7fafa]">Back to cart</Link>
+                <button type="submit" disabled={loading || cartLoading} className="flex-[1.5] h-9 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded- text- font-bold shadow-sm disabled:opacity-50">
+                  {loading? "Placing order..." : `Use this address • Pay ${paymentMethod}`}
                 </button>
               </div>
             </form>
-          </section>
+          </div>
 
-          {/* Right Summary - Premium */}
-          <aside style={{position:'sticky',top:96,background:'#fff',border:'1px solid #ece8de',borderRadius:20,padding:24,boxShadow:'0 8px 24px rgba(0,0,0,.06)'}}>
-            <h2 style={{margin:'0 0 16px',fontSize:16,fontWeight:900}}>Order Summary</h2>
-            <div style={{padding:12,background:'#fafaf7',border:'1px dashed #ece8de',borderRadius:12,marginBottom:16,fontSize:12,lineHeight:1.5}}>
-              <strong style={{display:'block',fontSize:11,marginBottom:4}}>🔒 SECURE CHECKOUT</strong>
-              Your information is protected with 256-bit SSL encryption.
+          <div className="bg-white border border-[#d5d9d9] rounded- p-4 sticky top-">
+            <button disabled={loading || cartLoading} onClick={handleSubmit} className="w-full h-10 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded- text- font-bold shadow-sm disabled:opacity-50">
+              {loading? "Processing..." : `Place your order • ₹${finalTotal.toLocaleString("en-IN")}`}
+            </button>
+            <p className="text- mt-3 leading- text-[#565959]">By placing your order, you agree to ShopZone's privacy notice and conditions of use. FREE delivery • 10 days return • 1 year warranty.</p>
+
+            <div className="mt-4 border-t border-[#eaeaea] pt-3">
+              <h3 className="font-bold text- mb-2">Order Summary • {totalItems} items</h3>
+              {cartLoading? (
+                <div className="text- text-[#565959]">Loading cart...</div>
+              ) : cartItems.length===0? (
+                <div className="text- text-[#c40000]">Cart is empty • <Link to="/products" className="text-[#0066c0] underline">Add products</Link></div>
+              ) : (
+                <>
+                  <div className="max-h- overflow-y-auto space-y-2 mb-3 pr-1">
+                    {cartItems.map(it=>{
+                      const p = it.product || {};
+                      return (
+                        <div key={it.id} className="flex gap-2 text- border-b border-[#f0f2f2] pb-2 last:border-0">
+                          <img src={getImg(p)} alt="" className="w-10 h-10 object-contain border bg-[#f7f7f7] rounded-" />
+                          <div className="flex-1 line-clamp-2 leading-">{it.product_name || p.name} <span className="text-[#565959]">x {it.quantity}</span></div>
+                          <div className="font-bold">₹{Number(it.price?? p.price?? 0).toLocaleString("en-IN")}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text- space-y-1.5">
+                    <div className="flex justify-between"><span>Items ({totalItems}):</span><span>₹{subtotal.toLocaleString("en-IN")}</span></div>
+                    <div className="flex justify-between"><span>Delivery:</span><span className="text-[#067D62] font-bold">FREE Prime Delivery</span></div>
+                    {codFee>0 && <div className="flex justify-between"><span>COD fee:</span><span>₹{codFee}</span></div>}
+                    <div className="flex justify-between font-bold text- border-t border-[#eaeaea] pt-2 text-[#C45500]"><span>Order Total:</span><span>₹{finalTotal.toLocaleString("en-IN")}</span></div>
+                    <div className="text- text-[#067D62]">Inclusive of all taxes • EMI from ₹{Math.round(finalTotal/12)}/month</div>
+                  </div>
+                  <div className="mt-3 text- text-[#067D62] border border-[#d5d9d9] p-2 rounded- bg-[#f0f8f0] flex gap-1"><span>✓</span><span>Prime FREE One-Day Delivery • EMI • Pay on Delivery • 10 days replacement • Secure transaction</span></div>
+                </>
+              )}
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:12,fontSize:14}}>
-              <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#8c8881'}}>Subtotal</span><span style={{fontWeight:700}}>Calculated at next step</span></div>
-              <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#8c8881'}}>Shipping</span><span style={{color:'#10b981',fontWeight:700}}>Free ✓</span></div>
-              <div style={{display:'flex',justifyContent:'space-between',paddingTop:12,borderTop:'1px solid #ece8de'}}><span style={{fontWeight:800}}>Total</span><span style={{fontWeight:900,fontSize:18}}>₹0</span></div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link to="/addresses" className="h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white">Manage Addresses</Link>
+              <Link to="/cart" className="h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white">Edit Cart</Link>
             </div>
-            <div style={{marginTop:16,display:'flex',alignItems:'center',gap:8,fontSize:11,color:'#b8b3a9',fontWeight:600,justifyContent:'center'}}>
-              <span>💳</span> UPI • Cards • COD • Net Banking
-            </div>
-          </aside>
+          </div>
         </div>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @media(max-width:1100px){.checkout-layout{grid-template-columns:1fr !important;} aside{position:static !important;}} @media(max-width:600px){.checkout-grid{grid-template-columns:1fr !important;}}`}</style>
-    </main>
+    </div>
   );
 }
 

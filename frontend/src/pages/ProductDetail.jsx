@@ -1,32 +1,74 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { getProduct } from "../services/productService";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { getProduct, getProducts } from "../services/productService";
 import { addToCart } from "../services/cartService";
-import { addToWishlist } from "../services/wishlistService";
+import { toggleWishlist, isInWishlist } from "../services/wishlistService";
+
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/.*$/, "") || import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
+
+const resolveImage = (img) => {
+  try {
+    if (!img) return "";
+    let s = typeof img === "string"? img : img.image || img.url || img.src || img.file || "";
+    if (!s) return "";
+    s = String(s).trim();
+    if (s.startsWith("http")) return s;
+    if (s.startsWith("blob:")) return s;
+    if (s.startsWith("/media")) return `${BASE}${s}`;
+    if (s.startsWith("media/")) return `${BASE}/${s}`;
+    if (s.startsWith("/")) return `${BASE}${s}`;
+    return `${BASE}/media/${s.replace(/^\/+/, "")}`;
+  } catch { return ""; }
+};
+
+const PLACEHOLDER = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&h=500&fit=crop";
 
 function ProductDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
+  const [related, setRelated] = useState([]);
   const [quantity, setQuantity] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishLoading, setWishLoading] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [wishlistSuccess, setWishlistSuccess] = useState("");
-  const [imageError, setImageError] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
+  const [imgError, setImgError] = useState(false);
+  const [pincode, setPincode] = useState("");
+  const [deliveryMsg, setDeliveryMsg] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true); setError(""); setProduct(null); setImageError(false); setQuantity(1); setActiveImg(0);
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      setProduct(null);
+      setImgError(false);
+      setQuantity(1);
+      setActiveImg(0);
       try {
         const data = await getProduct(id);
-        if (!data) throw new Error("Product data was not returned.");
-        if (!cancelled) setProduct(data);
+        if (!data) throw new Error("Product not found");
+        if (!cancelled) {
+          setProduct(data);
+          setSelectedVariant(data.variants?.[0] || null);
+          try { const exists = await isInWishlist(data.id || id); setInWishlist(!!exists); } catch {}
+          try {
+            const cat = data.category?.id || data.category_id || data.category;
+            if (cat) {
+              const r = await getProducts({ category: cat, page_size: 6 });
+              const list = r.results || r.products || r || [];
+              setRelated(Array.isArray(list)? list.filter(p=> String(p.id)!==String(data.id)).slice(0,4) : []);
+            }
+          } catch {}
+        }
       } catch (err) {
-        if (!cancelled) setError(err.response?.data?.detail || err.message || "Product load nahi ho paaya.");
+        if (!cancelled) setError(err.response?.data?.detail || err.message || "Product load failed");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -34,192 +76,259 @@ function ProductDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const stock = Number(product?.stock ?? 0);
-  const hasStock = stock > 0;
+  const stock = Number(product?.stock?? product?.quantity?? 0);
+  const hasStock = stock>0 || product?.in_stock===true || product?.is_in_stock===true || product?.stock_status==="in_stock";
 
-  const handleQuantityChange = (e) => {
-    const v = e.target.value;
-    if (v === "") { setQuantity(""); return; }
-    const num = Number(v);
-    if (!Number.isInteger(num)) return;
-    if (num < 1) { setQuantity(1); return; }
-    if (num > stock) { setQuantity(stock); return; }
-    setQuantity(num);
-  };
-
-  const handleDecrease = () => setQuantity(c => Math.max(1, Number(c)||1 - 1));
-  const handleIncrease = () => setQuantity(c => Math.min(stock, Number(c)||1 + 1));
-
-  const handleAddToCart = async () => {
-    if (!product || !hasStock || adding) return;
-    const q = Number(quantity);
-    if (!Number.isInteger(q) || q < 1 || q > stock) { setError("Please select a valid quantity."); return; }
+  const handleAddToCart = async (buyNow=false) => {
+    if (!product ||!hasStock || adding) return;
+    const q = Number(quantity)||1;
+    if (q<1 || (stock>0 && q>stock)) { setError(`Only ${stock} left in stock`); return; }
     setAdding(true); setError(""); setSuccess("");
     try {
-      await addToCart(product.id, q);
-      setSuccess(`${q} ${q===1?'item':'items'} cart me successfully add ho gaya.`);
+      await addToCart(product.id, q, selectedVariant?.id);
+      setSuccess(`${q} item added to Cart • Prime FREE delivery`);
+      window.dispatchEvent(new Event("cart-change"));
+      if (buyNow) navigate("/checkout");
     } catch (err) {
-      setError(err.response?.data?.detail || "Product cart me add nahi ho paaya.");
-    } finally {
-      setAdding(false);
-    }
+      setError(err.response?.data?.detail || err.message || "Add to cart failed");
+    } finally { setAdding(false); }
   };
 
-  const handleAddToWishlist = async () => {
-    if (!product || wishlistLoading) return;
-    setWishlistLoading(true); setError(""); setWishlistSuccess("");
+  const handleWishlist = async () => {
+    if (!product || wishLoading) return;
+    setWishLoading(true);
     try {
-      await addToWishlist(product.id);
-      setWishlistSuccess("Product wishlist me add ho gaya.");
+      const res = await toggleWishlist(product.id);
+      setInWishlist(res.inWishlist?? res.in_wishlist??!inWishlist);
+      window.dispatchEvent(new Event("wishlist-change"));
     } catch (err) {
-      setError(err.response?.data?.detail || "Product wishlist me add nahi ho paaya.");
-    } finally {
-      setWishlistLoading(false);
-    }
+      setError(err.response?.data?.detail || "Wishlist failed");
+    } finally { setWishLoading(false); }
+  };
+
+  const checkDelivery = () => {
+    if (!pincode || pincode.length!==6) { setDeliveryMsg("Enter valid 6-digit pincode like 110059"); return; }
+    const d = new Date(Date.now()+24*3600*1000);
+    setDeliveryMsg(`✓ FREE delivery by Tomorrow, ${d.toLocaleDateString("en-IN",{weekday:"short", day:"2-digit", month:"short"})} • COD available • 10 days Returnable • Pincode: ${pincode} • Prime`);
   };
 
   if (loading) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'40px 24px'}}>
-        <div style={{maxWidth:1120,margin:'0 auto',display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:32}}>
-          <div style={{height:520,background:'#fff',border:'1px solid #ece8de',borderRadius:24,animation:'pulse 1.5s infinite'}} />
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            {[1,2,3,4].map(i=>(<div key={i} style={{height:24,background:'#fff',border:'1px solid #ece8de',borderRadius:8,animation:'pulse 1.5s infinite'}} />))}
-          </div>
+      <div className="bg-[#EAEDED] min-h-screen p-4">
+        <div className="max-w- mx-auto grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-2">
+          <div className="bg-white h- animate-pulse rounded- border border-[#d5d9d9]" />
+          <div className="bg-white h- animate-pulse rounded- border border-[#d5d9d9]" />
         </div>
-      </main>
+      </div>
     );
   }
 
-  if (error && !product) {
+  if (error &&!product) {
     return (
-      <main style={{minHeight:'100vh',background:'#fafaf7',padding:'40px 24px',display:'grid',placeItems:'center'}}>
-        <div style={{textAlign:'center',padding:40,background:'#fff',border:'1px solid #ece8de',borderRadius:24,maxWidth:420}}>
-          <h2 style={{fontWeight:900}}>Product Not Found</h2>
-          <p style={{color:'#8c8881'}}>{error}</p>
-          <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:20}}>
-            <button onClick={()=>window.location.reload()} style={{minHeight:42,padding:'0 20px',borderRadius:999,background:'#1a1816',color:'#fff',border:0,fontWeight:700}}>Try Again</button>
-            <Link to="/products" style={{minHeight:42,padding:'0 20px',display:'inline-flex',alignItems:'center',borderRadius:999,border:'1px solid #ece8de',background:'#fff',fontWeight:700}}>Back to Products</Link>
+      <div className="bg-[#EAEDED] min-h-screen grid place-items-center p-4">
+        <div className="bg-white p-8 rounded- shadow-sm text-center max-w- w-full border border-[#d5d9d9]">
+          <div className="text-">😕</div>
+          <h2 className="font-bold text- mt-2">Product Not Found</h2>
+          <p className="text- text-[#565959] mt-2">{error}</p>
+          <div className="flex gap-2 justify-center mt-4">
+            <button onClick={()=>window.location.reload()} className="bg-[#FFD814] border border-[#FCD200] px-6 h-9 rounded- text- font-bold shadow-sm">Try Again</button>
+            <Link to="/products" className="border border-[#d5d9d9] px-6 h-9 grid place-items-center rounded- text- bg-white shadow-sm">Back to Products</Link>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!product) return null;
 
-  const images = Array.isArray(product.images) && product.images.length>0 ? product.images : product.image ? [product.image] : [];
+  const rawImages = Array.isArray(product.images)&&product.images.length>0? product.images : product.image? [product.image] : [];
+  const resolvedImages = rawImages.map(resolveImage).filter(Boolean);
+  const images = resolvedImages.length>0? resolvedImages : [PLACEHOLDER];
   const primaryImage = images[activeImg] || images[0];
-  const category = product.category_name || product.category || "Product";
-  const price = Number(product.price || 0);
-  const mrp = Number(product.original_price || product.mrp || price*1.25);
-  const discount = mrp>price ? Math.round((1-price/mrp)*100) : 0;
+
+  const price = Number(selectedVariant?.price || product.price || 0);
+  const mrp = Number(product.original_price || product.mrp || product.compare_price || (price*1.25));
+  const discount = mrp>price? Math.round((1-price/mrp)*100) : 0;
+  const rating = Number(product.rating || product.avg_rating || 4.5);
+  const reviews = Number(product.review_count || product.num_reviews || 2456);
+  const category = product.category_name || product.category?.name || (typeof product.category==="string"? product.category : "General");
 
   return (
-    <main className="product-detail-page" style={{minHeight:'100vh',background:'#fafaf7',padding:'24px'}}>
-      <div className="product-detail-container" style={{maxWidth:1120,margin:'0 auto'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:600,color:'#8c8881',marginBottom:20}}>
-          <Link to="/" style={{color:'#8c8881'}}>Home</Link><span>/</span><Link to="/products" style={{color:'#8c8881'}}>Products</Link><span>/</span><span style={{color:'#1a1816',fontWeight:800}}>{product.name || "Product"}</span>
+    <div className="bg-[#EAEDED] min-h-screen pb-6">
+      <div className="bg-white border-b border-[#ddd] sticky top-0 z-10">
+        <div className="max-w- mx-auto px-3 h-10 flex items-center gap-2 text- text-[#565959] overflow-hidden">
+          <Link to="/" className="hover:text-[#C45500] hover:underline">Home</Link><span>›</span>
+          <Link to="/products" className="hover:text-[#C45500] hover:underline">Products</Link><span>›</span>
+          <Link to={`/category/${String(category).toLowerCase()}`} className="hover:text-[#C45500] hover:underline truncate">{category}</Link><span>›</span>
+          <span className="text-[#0F1111] truncate max-w-">{product.name}</span>
         </div>
+      </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1.15fr .85fr',gap:32,alignItems:'start'}}>
-          {/* Image */}
-          <div className="product-detail-image" style={{background:'#fff',border:'1px solid #ece8de',borderRadius:24,padding:16,position:'sticky',top:88}}>
-            <div style={{position:'relative',width:'100%',aspectRatio:'1/1',background:'#fafaf7',borderRadius:16,display:'grid',placeItems:'center',overflow:'hidden'}}>
-              {primaryImage && !imageError ? (
-                <img src={primaryImage} alt={product.name || "Product"} onError={()=>setImageError(true)} style={{width:'100%',height:'100%',objectFit:'contain',padding:20}} />
-              ) : (
-                <span style={{fontSize:64}}>📦</span>
-              )}
-              {discount>0 && <span style={{position:'absolute',top:12,left:12,padding:'6px 10px',borderRadius:999,background:'#1a1816',color:'#fff',fontSize:11,fontWeight:800}}>{discount}% OFF</span>}
-              {hasStock ? <span style={{position:'absolute',top:12,right:12,padding:'6px 10px',borderRadius:999,background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#166534',fontSize:10,fontWeight:800}}>● IN STOCK</span> : <span style={{position:'absolute',top:12,right:12,padding:'6px 10px',borderRadius:999,background:'#fef2f2',border:'1px solid #fecaca',color:'#991b1b',fontSize:10,fontWeight:800}}>OUT OF STOCK</span>}
-            </div>
-            {images.length>1 && (
-              <div style={{display:'flex',gap:8,marginTop:12,overflowX:'auto'}}>
-                {images.map((img,i)=>(
-                  <button key={i} onClick={()=>setActiveImg(i)} style={{width:64,height:64,flexShrink:0,borderRadius:12,border:`1px solid ${activeImg===i ? '#1a1816' : '#ece8de'}`,background:'#fff',padding:4,overflow:'hidden',cursor:'pointer',opacity: activeImg===i ? 1 : .7}}>
-                    <img src={img} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}} />
+      <div className="max-w- mx-auto px-2 py-2">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-2 items-start">
+          <div className="bg-white p-3 md:p-4 shadow-sm rounded- border border-[#d5d9d9]">
+            <div className="grid grid-cols-1 md:grid-cols-[72px_1fr_1fr] gap-4">
+              <div className="flex md:flex-col gap-2 order-2 md:order-1 overflow-x-auto md:overflow-visible pb-1">
+                {images.map((src,i)=>(
+                  <button key={i} onClick={()=>{ setActiveImg(i); setImgError(false); }} className={`w-14 h-14 border p-1 shrink-0 rounded- bg-white ${activeImg===i? 'border-[#e77600] shadow-[0_0_3px_#e77600] ring-1 ring-[#e77600]' : 'border-[#d5d9d9] hover:border-[#e77600]'}`}>
+                    <img src={src} alt={`thumb ${i}`} className="w-full h-full object-contain" onError={(e)=> e.currentTarget.src = PLACEHOLDER} />
                   </button>
                 ))}
               </div>
-            )}
+
+              <div className="h- md:h- grid place-items-center order-1 md:order-2 relative bg-white border border-[#f0f2f2] rounded- p-2">
+                {!imgError? (
+                  <img src={primaryImage} alt={product.name} onError={()=>setImgError(true)} className="max-h-full max-w-full object-contain hover:scale-[1.02] transition" />
+                ) : (
+                  <div className="grid place-items-center text-center">
+                    <span className="text-">📦</span>
+                    <img src={PLACEHOLDER} alt="fallback" className="w-40 h-40 object-contain opacity-60 mt-2" />
+                  </div>
+                )}
+                {discount>0 && <span className="absolute top-2 left-2 bg-[#CC0C39] text-white text- font-bold px-2 py-1 rounded-">{discount}% OFF • Deal • Prime</span>}
+                {hasStock && <span className="absolute bottom-2 right-2 bg-[#067D62] text-white text- px-2 py-0.5 rounded-full font-bold">Prime ✓ FREE</span>}
+              </div>
+
+              <div className="order-3">
+                <h1 className="text- md:text- leading- text-[#0F1111] font-normal">{product.name}</h1>
+                <div className="text- text-[#007185] mt-1 hover:text-[#C45500] cursor-pointer hover:underline">Visit the {category} Store • Brand: {product.brand || "ShopZone"} • Seller: ShopZone Retail</div>
+
+                <div className="flex items-center gap-2 mt-2 text- flex-wrap">
+                  <span className="flex items-center gap-0.5">
+                    <span className="text-[#e47911] text-">{"★".repeat(Math.floor(rating))}{"☆".repeat(5-Math.floor(rating))}</span>
+                    <span className="text-[#007185] hover:underline cursor-pointer ml-1">{rating.toFixed(1)}</span>
+                  </span>
+                  <span className="text-[#007185] hover:underline cursor-pointer">{reviews.toLocaleString()} ratings</span>
+                  <span className="text-[#565959]">|</span>
+                  <span className="text-[#007185] hover:underline cursor-pointer">500+ answered questions</span>
+                </div>
+
+                <hr className="my-3 border-[#e7e7e7]" />
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  {discount>0 && <span className="text-[#CC0C39] text- font-light">- {discount}%</span>}
+                  <span className="text- font-medium text-[#0F1111]">₹{price.toLocaleString("en-IN")}</span>
+                  <span className="text-">.00</span>
+                </div>
+                <div className="text- text-[#565959]">M.R.P: <span className="line-through">₹{mrp.toLocaleString("en-IN")}</span> • Inclusive of all taxes • <span className="text-[#067D62] font-bold">Prime FREE</span></div>
+                <div className="mt-2 text-"><span className="bg-[#067D62] text-white px-1.5 py-0.5 rounded- text- font-bold">Prime</span> <span className="text-[#067D62] font-bold">FREE delivery</span> Tomorrow by 9 PM • <b>Fulfilled</b> • EMI from ₹{Math.round(price/12)}/mo</div>
+
+                {product.variants && product.variants.length>0 && (
+                  <div className="mt-4">
+                    <div className="text- font-bold">Style: <span className="font-normal">{selectedVariant?.name || product.variants[0].name || "Default"}</span></div>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {product.variants.map((v,i)=>(
+                        <button key={v.id || i} onClick={()=>setSelectedVariant(v)} className={`border px-3 py-1.5 rounded- text- font-medium ${selectedVariant?.id===v.id? 'border-[#e77600] bg-[#fef8f2] ring-1 ring-[#e77600]' : 'border-[#d5d9d9] hover:border-[#e77600] bg-white'}`}>
+                          {v.name} {v.price? `₹${v.price}` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 text- leading- text-[#0F1111]">
+                  <b>About this item:</b>
+                  <p className="mt-1 text- text-[#565959] line-clamp-6 leading-">{product.description || "Premium quality product with 1 year manufacturer warranty, fast Prime delivery across India. 10 days replacement, cash on delivery, EMI available, GST invoice, made in India. Secure transaction."}</p>
+                  <Link to="#details" className="text- text-[#0066c0] hover:underline mt-1 inline-block">See more product details</Link>
+                </div>
+
+                <div className="mt-4 border border-[#d5d9d9] rounded- p-2.5 flex gap-2 bg-white">
+                  <input value={pincode} onChange={e=>setPincode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="Enter pincode 110059" className="flex-1 border border-[#888] rounded- px-2 h-8 text- outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_#e77600]" />
+                  <button onClick={checkDelivery} className="h-8 px-4 border border-[#d5d9d9] rounded- text- bg-white hover:bg-[#f0f2f2] shadow-sm">Check</button>
+                </div>
+                {deliveryMsg && <div className="mt-2 text- text-[#067D62] bg-[#E8F6EF] border border-[#A4D4AE] p-2 rounded- leading-">{deliveryMsg}</div>}
+
+                {hasStock && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <span className="text- font-bold">Quantity:</span>
+                    <div className="flex items-center border border-[#d5d9d9] rounded- overflow-hidden h-8 shadow-sm bg-white">
+                      <button onClick={()=>setQuantity(c=>Math.max(1,(Number(c)||1)-1))} className="w-8 bg-[#f0f2f2] hover:bg-[#e7e9ec] text- h-full grid place-items-center">−</button>
+                      <input type="number" value={quantity} onChange={e=>{ const v=e.target.value; if(v==="") {setQuantity(""); return;} const num=Number(v); if(Number.isInteger(num)&&num>=1&& (stock===0||num<=stock)) setQuantity(num); }} className="w-12 text-center border-x border-[#d5d9d9] outline-none text- h-full" />
+                      <button onClick={()=>setQuantity(c=> stock>0? Math.min(stock,(Number(c)||1)+1) : (Number(c)||1)+1)} className="w-8 bg-[#f0f2f2] hover:bg-[#e7e9ec] text- h-full grid place-items-center">+</button>
+                    </div>
+                    <span className="text- text-[#067D62] font-bold">{stock>0? `${stock} left - order soon • Prime` : "In stock • Prime"}</span>
+                  </div>
+                )}
+
+                {error && <div className="mt-3 text- text-[#CC0C39] border border-[#CC0C39]/30 p-2 rounded- bg-[#FFF6F6]">⚠ {error}</div>}
+                {success && <div className="mt-3 text- text-[#067D62] bg-[#E8F6EF] border border-[#A4D4AE] p-2 rounded- flex justify-between items-center">{success} <Link to="/cart" className="text-[#007185] font-bold underline ml-2">Go to Cart →</Link></div>}
+              </div>
+            </div>
+
+            <div id="details" className="mt-6 border-t border-[#e7e7e7] pt-4">
+              <h3 className="font-bold text-">Customer Reviews • {rating} ★ • {reviews.toLocaleString()} ratings • Prime Verified Purchase</h3>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text- space-y-1.5">
+                  {[5,4,3,2,1].map(s=>(
+                    <div key={s} className="flex items-center gap-2">
+                      <span className="text-[#007185] w-12 text- hover:underline cursor-pointer">{s} star</span>
+                      <div className="flex-1 h-4 bg-[#f0f2f2] border border-[#d5d9d9] rounded- overflow-hidden"><div className="h-full bg-[#FFA41C]" style={{width: `${s===5?70:s===4?20:s===3?6:s===2?2:2}%`}} /></div>
+                      <span className="text-[#007185] w-8 text-">{s===5?70:s===4?20:s*2}%</span>
+                    </div>
+                  ))}
+                  <Link to="#reviews" className="text- text-[#0066c0] hover:underline inline-block mt-2">See all {reviews} reviews →</Link>
+                </div>
+                <div className="md:col-span-2 text- text-[#565959] bg-[#f7fafa] border border-[#f0f2f2] rounded- p-3">
+                  <b className="text-[#0F1111]">Top reviews from India</b><br/>
+                  <span className="text-[#e47911]">★★★★★</span> <b>Great quality, fast Prime delivery, value for money.</b> Highly recommended! Product exactly as described. 10/10 for packaging and delivery. Will buy again. — Verified Purchase • Prime Member • Delhi
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Info */}
-          <div className="product-detail-info" style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div>
-              <span style={{display:'inline-flex',padding:'4px 10px',borderRadius:999,background:'#fff',border:'1px solid #ece8de',fontSize:10,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'#8c8881',marginBottom:10}}>{category}</span>
-              <h1 style={{margin:'0 0 10px',fontSize:'clamp(24px,3.5vw,32px)',fontWeight:900,lineHeight:1.1,letterSpacing:'-.03em',color:'#1a1816'}}>{product.name || "Product"}</h1>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{color:'#f59e0b',fontSize:14}}>★★★★★</span>
-                <span style={{fontSize:12,fontWeight:700,padding:'2px 8px',background:'#fffbeb',borderRadius:999}}>4.8 (2.4k reviews)</span>
-              </div>
+          <div className="bg-white p-4 shadow-sm border border-[#d5d9d9] rounded- sticky top- h-fit">
+            <div className="text- font-medium text-[#0F1111]">₹{price.toLocaleString("en-IN")}<span className="text-">.00</span> {discount>0 && <span className="ml-2 text- text-[#565959] line-through">₹{mrp.toLocaleString("en-IN")}</span>}</div>
+            <div className="text- text-[#565959] mt-1 leading-">₹{(price*0.18).toFixed(0)} delivery charge waived on Prime • <span className="text-[#067D62] font-bold">FREE delivery</span> <span className="font-bold text-[#0F1111]">Tomorrow 9 AM - 9 PM</span> • Details</div>
+            <div className="text- text-[#007185] mt-1 hover:underline cursor-pointer">Deliver to Delhi 110059 - Update location • Prime</div>
+            <div className={`text- mt-2 font-medium ${hasStock? 'text-[#067D62]' : 'text-[#CC0C39]'}`}>{hasStock? '✓ In stock • Ready to ship' : '✗ Currently unavailable • Notify me'}</div>
+            <div className="text- text-[#565959] mt-1">Ships from: <b>ShopZone Fulfilled</b> • Sold by: <b>ShopZone Retail Pvt Ltd</b> • GST invoice</div>
+
+            <div className="mt-3 text- bg-[#f7fafa] border border-[#f0f2f2] rounded- p-2">
+              <label className="flex items-center gap-2"><input type="checkbox" defaultChecked className="accent-[#e77600]" /> Add 2-year Prime protection plan • ₹149 • 1-click</label>
+              <div className="text- text-[#067D62] ml-6">✓ Accidental damage • ✓ Free replacement</div>
             </div>
 
-            <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap'}}>
-              <p style={{margin:0,fontSize:28,fontWeight:900,color:'#1a1816'}}>₹{price.toLocaleString("en-IN")}</p>
-              {mrp>price && (
-                <>
-                  <span style={{fontSize:14,color:'#b8b3a9',textDecoration:'line-through'}}>₹{mrp.toLocaleString("en-IN")}</span>
-                  <span style={{fontSize:12,fontWeight:800,color:'#166534',background:'#f0fdf4',border:'1px solid #bbf7d0',padding:'4px 8px',borderRadius:999}}>Save ₹{(mrp-price).toLocaleString("en-IN")}</span>
-                </>
-              )}
+            <button disabled={!hasStock || adding} onClick={()=>handleAddToCart(false)} className={`mt-4 w-full h-9 rounded- text- shadow-sm border font-medium ${hasStock? 'bg-[#FFD814] hover:bg-[#F7CA00] border-[#FCD200]' : 'bg-[#f0f2f2] text-[#565959] border-[#d5d9d9] cursor-not-allowed'}`}>
+              {adding? 'Adding...' : 'Add to Cart • Prime FREE'}
+            </button>
+            <button onClick={()=>handleAddToCart(true)} disabled={!hasStock || adding} className="mt-2 w-full h-9 rounded- bg-[#FFA41C] hover:bg-[#FA8900] text- shadow-sm border border-[#FF8F00] font-medium disabled:opacity-50">Buy Now • 1-Click • Prime</button>
+
+            <button onClick={handleWishlist} disabled={wishLoading} className={`mt-3 w-full h-8 border rounded- text- shadow-sm flex items-center justify-center gap-1.5 ${inWishlist? 'bg-[#FFF6F6] border-[#CC0C39]/40 text-[#CC0C39]' : 'bg-white border-[#d5d9d9] hover:bg-[#f7f7f7] text-[#0F1111]'}`}>
+              <span className="text-">{inWishlist? '♥' : '♡'}</span> {wishLoading? 'Adding...' : inWishlist? 'Added to Wishlist • View' : 'Add to Wishlist • Save for later'}
+            </button>
+
+            <div className="mt-4 text- text-[#565959] space-y-1.5 border-t border-[#e7e7e7] pt-3 leading-">
+              <div className="flex gap-2"><span className="text-[#067D62]">✓</span> <span><b>Secure transaction</b> • UPI, Cards, NetBanking, Wallet, COD</span></div>
+              <div className="flex gap-2"><span className="text-[#067D62]">✓</span> <span>Ships from & sold by ShopZone • Prime • Fulfilled by ShopZone</span></div>
+              <div className="flex gap-2"><span className="text-[#067D62]">✓</span> <span>10 days Replacement • 1 Year Warranty • GST Invoice</span></div>
+              <div className="flex gap-2"><span className="text-[#067D62]">✓</span> <span>Cash on Delivery • EMI from ₹{Math.round(price/12)}/mo • Pay on Delivery</span></div>
             </div>
 
-            <p style={{margin:0,color:'#3d3935',fontSize:14,lineHeight:1.7,padding:16,background:'#fff',border:'1px solid #ece8de',borderRadius:16}}>
-              {product.description || "Premium quality product with warranty and fast delivery across India."}
-            </p>
-
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background: hasStock ? '#f0fdf4' : '#fef2f2',border:`1px solid ${hasStock ? '#bbf7d0' : '#fecaca'}`,borderRadius:12,fontSize:12,fontWeight:700,color: hasStock ? '#166534' : '#991b1b'}}>
-              <span style={{width:6,height:6,borderRadius:'50%',background: hasStock ? '#22c55e' : '#ef4444',display:'inline-block'}} />
-              {hasStock ? `${stock} ${stock===1?'item':'items'} available • Free delivery` : "Out of stock • Notify me"}
+            <div className="mt-3 flex gap-2">
+              <Link to="/cart" className="flex-1 h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white hover:bg-[#f7fafa] shadow-sm">Go to Cart</Link>
+              <Link to="/wishlist" className="flex-1 h-8 border border-[#d5d9d9] rounded- grid place-items-center text- bg-white hover:bg-[#f7fafa] shadow-sm">Wishlist ({inWishlist?1:0})</Link>
             </div>
 
-            {error && <div role="alert" style={{padding:'10px 14px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:12,color:'#991b1b',fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
-            {success && <div role="status" style={{padding:'10px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,color:'#166534',fontSize:13,fontWeight:600}}>✓ {success} <Link to="/cart" style={{marginLeft:8,fontWeight:800,textDecoration:'underline'}}>Go to Cart →</Link></div>}
-            {wishlistSuccess && <div role="status" style={{padding:'10px 14px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:12,color:'#1e40af',fontSize:13,fontWeight:600}}>♡ {wishlistSuccess} <Link to="/wishlist" style={{marginLeft:8,fontWeight:800,textDecoration:'underline'}}>Go to Wishlist →</Link></div>}
-
-            {hasStock && (
-              <div className="quantity-control" style={{display:'flex',alignItems:'center',gap:16,padding:16,background:'#fff',border:'1px solid #ece8de',borderRadius:16}}>
-                <label htmlFor="quantity" style={{fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em'}}>Quantity</label>
-                <div style={{display:'flex',alignItems:'center',border:'1px solid #ece8de',borderRadius:999,overflow:'hidden',height:40}}>
-                  <button type="button" onClick={handleDecrease} disabled={adding || Number(quantity)<=1} style={{width:40,height:40,border:0,background:'#fff',display:'grid',placeItems:'center',fontSize:16,fontWeight:700,cursor:'pointer',opacity: Number(quantity)<=1 ? .3 : 1}}>−</button>
-                  <input id="quantity" type="number" min={1} max={stock} value={quantity} onChange={handleQuantityChange} disabled={adding} style={{width:56,height:40,border:'none',borderLeft:'1px solid #ece8de',borderRight:'1px solid #ece8de',textAlign:'center',fontWeight:800,fontSize:14,outline:'none'}} />
-                  <button type="button" onClick={handleIncrease} disabled={adding || Number(quantity)>=stock} style={{width:40,height:40,border:0,background:'#fff',display:'grid',placeItems:'center',fontSize:16,fontWeight:700,cursor:'pointer',opacity: Number(quantity)>=stock ? .3 : 1}}>+</button>
-                </div>
-                <span style={{fontSize:11,color:'#8c8881'}}>Max: {stock}</span>
-              </div>
-            )}
-
-            <div className="detail-actions" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <button type="button" disabled={!hasStock || adding || wishlistLoading} onClick={handleAddToCart} style={{minHeight:52,borderRadius:999,background:hasStock ? '#1a1816' : '#f5f2eb',color: hasStock ? '#fff' : '#b8b3a9',border:`1px solid ${hasStock ? '#1a1816' : '#ece8de'}`,fontWeight:800,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,boxShadow: hasStock ? '0 8px 20px rgba(0,0,0,.18)' : 'none',cursor: hasStock ? 'pointer' : 'not-allowed',opacity: adding ? .7 : 1}}>
-                {adding ? 'Adding...' : hasStock ? `Add to Cart • ₹${(price*Number(quantity||1)).toLocaleString("en-IN")}` : 'Out of Stock'}
-              </button>
-              <button type="button" onClick={handleAddToWishlist} disabled={wishlistLoading || adding} style={{minHeight:52,borderRadius:999,background:'#fff',color:'#1a1816',border:'1px solid #ece8de',fontWeight:700,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,cursor:'pointer'}}>
-                {wishlistLoading ? 'Adding...' : '♡ Wishlist'}
-              </button>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,paddingTop:12}}>
-              {[
-                {icon:'🚚',t:'Free Delivery',s:'Above ₹999'},
-                {icon:'↩',t:'30 Days Return',s:'Easy returns'},
-                {icon:'🔒',t:'Secure Payment',s:'100% safe'},
-              ].map(b=>(
-                <div key={b.t} style={{padding:12,background:'#fff',border:'1px solid #ece8de',borderRadius:12,textAlign:'center'}}>
-                  <div style={{fontSize:18}}>{b.icon}</div>
-                  <div style={{fontSize:11,fontWeight:800,marginTop:4}}>{b.t}</div>
-                  <div style={{fontSize:10,color:'#8c8881'}}>{b.s}</div>
-                </div>
-              ))}
-            </div>
-
-            <Link to="/products" style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:'#8c8881',marginTop:4}}>← Back to Products</Link>
+            <div className="mt-3 text- text-center text-[#767676]">Add to Cart = Prime FREE Delivery • EMI • COD • 10 days return</div>
           </div>
         </div>
+
+        {related.length>0 && (
+          <div className="mt-4 bg-white p-4 rounded- shadow-sm border border-[#d5d9d9]">
+            <h3 className="font-bold text-">Products related to this item • Customers who viewed this also viewed • Prime</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              {related.map(r=>(
+                <Link key={r.id} to={`/product/${r.id}`} className="border border-[#d5d9d9] rounded- p-2 hover:shadow-md hover:border-[#a6a6a6] bg-white">
+                  <div className="bg-[#f7fafa] rounded- h-32 grid place-items-center"><img src={resolveImage(r.image || r.images?.[0]) || PLACEHOLDER} alt={r.name} className="h-full w-full object-contain p-1" onError={e=> e.target.src=PLACEHOLDER} /></div>
+                  <div className="text- mt-2 line-clamp-2 leading- min-h- hover:text-[#C45500]">{r.name}</div>
+                  <div className="text- font-bold mt-1">₹{Number(r.price||0).toLocaleString("en-IN")}</div>
+                  <div className="text- text-[#067D62]">Prime FREE • 4.3 ★</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1} 50%{opacity:.6}} @media(max-width:900px){.product-detail-container > div:nth-child(2){grid-template-columns:1fr !important;} .product-detail-image{position:static !important;}}`}</style>
-    </main>
+    </div>
   );
 }
 

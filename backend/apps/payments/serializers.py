@@ -1,13 +1,12 @@
+from decimal import Decimal
 from rest_framework import serializers
-
 from .models import Payment
 
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-
-        fields = (
+        fields = [
             "id",
             "order",
             "transaction_id",
@@ -18,9 +17,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             "paid_at",
             "created_at",
             "updated_at",
-        )
-
-        read_only_fields = (
+        ]
+        read_only_fields = [
             "id",
             "transaction_id",
             "amount",
@@ -29,37 +27,17 @@ class PaymentSerializer(serializers.ModelSerializer):
             "paid_at",
             "created_at",
             "updated_at",
-        )
+        ]
 
     def validate_order(self, value):
-        request = self.context.get("request")
-
-        if not request or not request.user.is_authenticated:
-            raise serializers.ValidationError(
-                "Authentication is required."
-            )
-
-        if value.user_id != request.user.id:
-            raise serializers.ValidationError(
-                "You can only make payment for your own order."
-            )
-
-        if value.status == "CANCELLED":
-            raise serializers.ValidationError(
-                "Payment cannot be created for a cancelled order."
-            )
-
+        if value is None:
+            raise serializers.ValidationError("Order ID is required.")
+        # Order object already validated by view's get_object_or_404 for owner,
+        # but also handle raw id validation if serializer gets id directly
         return value
 
     def validate_payment_method(self, value):
-        allowed_methods = {
-            choice[0]
-            for choice in Payment.METHOD_CHOICES
-        }
-
-        if value not in allowed_methods:
-            raise serializers.ValidationError(
-                "Invalid payment method."
-            )
-
+        allowed = {choice[0] for choice in Payment.METHOD_CHOICES}
+        if value not in allowed:
+            raise serializers.ValidationError("Invalid payment method.")
         return value

@@ -14,8 +14,7 @@ const saveUser = (data) => {
   return user;
 };
 
-// ── Get Profile ──────────────────────────────────────────────────
-// EXACT same API as yours - no change
+// ── Auth & Profile (Tera purana wala - same) ────────────────────
 export const getProfile = async () => {
   const response = await api.get("auth/profile/");
   const user = response.data?.user || response.data?.profile || response.data;
@@ -23,7 +22,6 @@ export const getProfile = async () => {
   return response.data;
 };
 
-// ── Extra - Flipkart My Account 11/10 ────────────────────────────
 export const updateProfile = async (profileData) => {
   if (!profileData || typeof profileData !== "object") throw new Error("Invalid profile data.");
   const response = await api.patch("auth/profile/", profileData);
@@ -42,6 +40,12 @@ export const updateAvatar = async (file) => {
   return response.data;
 };
 
+export const changePassword = async (data) => {
+  const response = await api.post("auth/change-password/", data);
+  return response.data;
+};
+
+// ── Addresses (Tera purana wala) ─────────────────────────────────
 export const getAddresses = async () => {
   const response = await api.get("auth/addresses/");
   return response.data;
@@ -62,6 +66,7 @@ export const deleteAddress = async (id) => {
   return response.data;
 };
 
+// ── Wishlist (Tera purana wala) ──────────────────────────────────
 export const getWishlist = async () => {
   const response = await api.get("wishlist/");
   return response.data;
@@ -76,5 +81,37 @@ export const addToWishlist = async (productId) => {
 export const removeFromWishlist = async (productId) => {
   const response = await api.delete(`wishlist/${Number(productId)}/`);
   window.dispatchEvent(new Event("wishlist-change"));
+  return response.data;
+};
+
+// ── Orders & Returns (NEW - Amazon Working) ──────────────────────
+export const getMyOrders = async () => {
+  const response = await api.get("orders/my-orders/");
+  return response.data;
+};
+
+export const getOrderDetail = async (id) => {
+  const response = await api.get(`orders/${id}/`);
+  return response.data;
+};
+
+export const cancelOrder = async (id) => {
+  const response = await api.post(`orders/${id}/cancel/`);
+  return response.data;
+};
+
+export const getMyReturns = async () => {
+  const response = await api.get("orders/returns/");
+  return response.data;
+};
+
+export const requestReturn = async (orderId, data) => {
+  // data = { item, reason, description }
+  const response = await api.post(`orders/${orderId}/return/`, data);
+  return response.data;
+};
+
+export const getReturnDetail = async (returnId) => {
+  const response = await api.get(`orders/returns/${returnId}/`);
   return response.data;
 };
