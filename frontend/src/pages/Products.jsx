@@ -27,7 +27,9 @@ function Products() {
     if (deals) return "__DEALS__";
     const cat = searchParams.get("category") || "";
     if (!cat) return "";
-    const match = FIXED_CATEGORIES.find((c) => c.slug === cat.toLowerCase() || c.value.toLowerCase() === cat.toLowerCase());
+    const match = FIXED_CATEGORIES.find(
+      (c) => c.slug === cat.toLowerCase() || c.value.toLowerCase() === cat.toLowerCase()
+    );
     return match? match.value : cat;
   });
   const [sort, setSort] = useState("latest");
@@ -53,7 +55,11 @@ function Products() {
     setError("");
     try {
       const data = await getProducts({ page_size: 100 });
-      const list = Array.isArray(data)? data : Array.isArray(data?.results)? data.results : data?.data || [];
+      const list = Array.isArray(data)
+       ? data
+        : Array.isArray(data?.results)
+       ? data.results
+        : data?.data || [];
       const unique = Array.from(new Map(list.map((p) => [p.id, p])).values());
       setProducts(unique);
     } catch (err) {
@@ -157,7 +163,8 @@ function Products() {
     return "https://via.placeholder.com/400x400?text=No+Image";
   };
 
-  const activeLabel = FIXED_CATEGORIES.find((c) => c.value === category)?.label || category || "All Products";
+  const activeLabel =
+    FIXED_CATEGORIES.find((c) => c.value === category)?.label || category || "All Products";
 
   if (loading) {
     return (
@@ -172,7 +179,9 @@ function Products() {
       <div className="bg-[#f1f3f6] min-h-screen grid place-items-center p-4">
         <div className="bg-white p-8 rounded shadow text-center">
           <p>{error}</p>
-          <button onClick={loadProducts} className="mt-4 bg-[#2874f0] text-white px-6 py-2 rounded">Retry</button>
+          <button onClick={loadProducts} className="mt-4 bg-[#2874f0] text-white px-6 py-2 rounded">
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -182,30 +191,52 @@ function Products() {
     <div className="bg-[#f1f3f6] min-h-screen pb-6">
       {cartMessage && (
         <div className="max-w- mx-auto px-2 pt-2">
-          <div className="bg-white p-3 border-l-4 border-[#388e3c] shadow-sm text-sm">✓ {cartMessage}</div>
+          <div className="bg-white p-3 border-l-4 border-[#388e3c] shadow-sm text-sm">
+            ✓ {cartMessage}
+          </div>
         </div>
       )}
       <div className="max-w- mx-auto px-2 py-2 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-2">
         <aside className="bg-white shadow-sm sticky top-2 rounded-lg p-4">
           <h3 className="font-bold text-sm">Filters</h3>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full h-9 mt-3 border px-2 text-sm rounded">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full h-9 mt-3 border px-2 text-sm rounded"
+          >
             {FIXED_CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
             ))}
           </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full h-9 mt-3 border px-2 text-sm rounded">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="w-full h-9 mt-3 border px-2 text-sm rounded"
+          >
             <option value="latest">Popularity</option>
             <option value="price-low">Low to High</option>
             <option value="price-high">High to Low</option>
           </select>
-          <input type="search" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-9 mt-3 border pl-3 text-sm rounded" />
+          <input
+            type="search"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-9 mt-3 border pl-3 text-sm rounded"
+          />
           {(search || category) && (
-            <button onClick={clearFilters} className="mt-3 text-xs text-[#2874f0] font-bold">CLEAR ALL</button>
+            <button onClick={clearFilters} className="mt-3 text-xs text-[#2874f0] font-bold">
+              CLEAR ALL
+            </button>
           )}
         </aside>
         <div className="bg-white shadow-sm rounded-lg">
           <div className="p-4 border-b flex justify-between">
-            <h1 className="font-bold text-sm">{activeLabel} - {filteredProducts.length} items</h1>
+            <h1 className="font-bold text-sm">
+              {activeLabel} - {filteredProducts.length} items
+            </h1>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[#f1f3f6]">
             {filteredProducts.map((product) => {
@@ -214,15 +245,27 @@ function Products() {
               const isWishing = wishId === product.id;
               return (
                 <div key={product.id} className="bg-white p-3 flex flex-col relative">
-                  <button onClick={() => handleWishlist(product)} disabled={isWishing} className="absolute top-2 right-2 w-7 h-7 bg-white border rounded-full grid place-items-center shadow-sm z-10">
+                  <button
+                    onClick={() => handleWishlist(product)}
+                    disabled={isWishing}
+                    className="absolute top-2 right-2 w-7 h-7 bg-white border rounded-full grid place-items-center shadow-sm z-10"
+                  >
                     <span className="text-sm">{isWishing? "..." : "♡"}</span>
                   </button>
                   <Link to={`/products/${product.id}`}>
-                    <img src={getProductImage(product)} alt={product.name} className="h- w-full object-contain" />
+                    <img
+                      src={getProductImage(product)}
+                      alt={product.name}
+                      className="h- w-full object-contain"
+                    />
                     <h3 className="text-sm mt-2 line-clamp-2">{product.name}</h3>
                     <div className="font-bold mt-1">₹{price.toLocaleString("en-IN")}</div>
                   </Link>
-                  <button disabled={!hasStock || addingId === product.id} onClick={() => handleAddToCart(product)} className="mt-3 h-8 bg-[#ff9f00] text-white rounded text-xs font-bold">
+                  <button
+                    disabled={!hasStock || addingId === product.id}
+                    onClick={() => handleAddToCart(product)}
+                    className="mt-3 h-8 bg-[#ff9f00] text-white rounded text-xs font-bold"
+                  >
                     {addingId === product.id? "ADDING..." : "ADD TO CART"}
                   </button>
                 </div>
