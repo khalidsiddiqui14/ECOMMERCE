@@ -33,7 +33,6 @@ api.interceptors.request.use((config) => {
     if (config.data instanceof FormData) delete config.headers["Content-Type"];
     else if (!config.headers["Content-Type"]) config.headers["Content-Type"] = "application/json";
     // Amazon: Add request-id for tracing
-    config.headers["X-Request-ID"] = `req_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
   } catch {}
   return config;
 });
