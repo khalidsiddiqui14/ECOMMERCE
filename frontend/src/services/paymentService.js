@@ -92,7 +92,7 @@ export const verifyPayment = async (paymentId, verificationData = {}) => {
   try {
     const pid = toId(paymentId, "payment ID");
     const response = await api.post(`payments/${pid}/verify/`, {
-     ...verificationData,
+    ...verificationData,
     });
     safeDispatch("order-updated");
     return response.data;
@@ -136,7 +136,7 @@ export const openRazorpayCheckout = (options) => {
         return;
       }
       const rzp = new window.Razorpay({
-       ...options,
+      ...options,
         handler: function(response) { resolve(response); },
         modal: { ondismiss: function() { reject(new Error("Payment cancelled")); } }
       });
@@ -144,6 +144,9 @@ export const openRazorpayCheckout = (options) => {
     } catch (err) { reject(err); }
   });
 };
+
+// ── FIX FOR RENDER BUILD - Checkout.jsx compatibility ✅ ────────
+export const initiateRazorpay = openRazorpayCheckout;
 
 // ── Create UPI Payment ───────────────────────────────────────────
 export const createUpiPayment = async (orderId, upiId = "") => {
@@ -228,6 +231,7 @@ export default {
   verifyPayment,
   createRazorpayOrder,
   openRazorpayCheckout,
+  initiateRazorpay,
   createUpiPayment,
   retryPayment,
   getPaymentMethods,
