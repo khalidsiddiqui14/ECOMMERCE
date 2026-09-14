@@ -1,23 +1,23 @@
 import os
+from dotenv import load_dotenv
+from google import genai
 
-from openai import OpenAI
+load_dotenv()
+API_KEY = os.environ.get("GEMINI_API_KEY")
+client = genai.Client(api_key=API_KEY) if API_KEY else None
 
-
-def ask_ai(message):
-    api_key = os.environ.get("OPENAI_API_KEY")
-
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is not loaded."
+def ask_ai(message: str, products_context: str = "") -> str:
+    if not client:
+        return "ERROR: GEMINI_API_KEY missing"
+    if not products_context:
+        products_context = "No products found"
+    prompt = f"You are a friendly shopping assistant. Products: {products_context} User: {message} Suggest with Rs price, short."
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
         )
-
-    client = OpenAI(
-        api_key=api_key,
-    )
-
-    response = client.responses.create(
-        model="gpt-5-mini",
-        input=message,
-    )
-
-    return response.output_text
+        return response.text
+    except Exception as e:
+        print(f"GEMINI ERROR: {e}")
+        return f"AI Error: {e}"
