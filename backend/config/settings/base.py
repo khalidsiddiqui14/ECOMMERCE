@@ -257,6 +257,17 @@ CORS_ALLOWED_ORIGINS = [
     "https://ecommerce-frontend-bc57.onrender.com",
 ]
 
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://ecommerce-frontend-bc57.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = ["*"]
+
 
 # Basic security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
