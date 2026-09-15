@@ -1,8 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from datetime import timedelta
+from django.utils import timezone
+import random
 
 from .managers import UserManager
-
 
 class User(AbstractUser):
     ROLE_CHOICES = (
@@ -54,3 +56,40 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+class OTP(models.Model):
+    email_or_phone = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    otp_code = models.CharField(
+        max_length=6,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    is_verified = models.BooleanField(
+        default=False,
+    )
+    
+    # --- SECURITY ADD KIYA - YE 2 LINE ADD KAR ---
+    is_used = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "OTP"
+        verbose_name_plural = "OTPs"
+
+    def __str__(self):
+        return f"{self.email_or_phone} - {self.otp_code}"
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=5)
+
+    @staticmethod
+    def generate_otp():
+        return str(random.randint(100000, 999999))

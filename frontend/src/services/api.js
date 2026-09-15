@@ -3,9 +3,14 @@ import axios from "axios";
 const API_BASE =
   import.meta.env.VITE_API_URL || "https://ecommerce-2-6amy.onrender.com/api/";
 
+// SECURITY: IMAGE_BASE fix - hardcoded fallback safe
 export const IMAGE_BASE = (() => {
   try {
     const url = new URL(API_BASE);
+    // Only allow https
+    if (url.protocol!== "https:" &&!url.hostname.includes("localhost")) {
+      return "https://ecommerce-2-6amy.onrender.com";
+    }
     return `${url.protocol}//${url.host}`;
   } catch {
     return "https://ecommerce-2-6amy.onrender.com";
@@ -16,6 +21,7 @@ const api = axios.create({
   baseURL: API_BASE.endsWith("/")? API_BASE : `${API_BASE}/`,
   timeout: 20000,
   headers: { Accept: "application/json" },
+  withCredentials: false, // SECURITY: JWT use kar rahe, cookie nahi
 });
 
 let isRefreshing = false;
@@ -29,9 +35,21 @@ api.interceptors.request.use((config) => {
   try {
     const token = localStorage.getItem("access_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // SECURITY: Sanitize - koi bhi script tag block karo
+    if (config.data && typeof config.data === 'object' &&!(config.data instanceof FormData)) {
+      // Basic XSS protection
+      const str = JSON.stringify(config.data);
+      if (str.includes("<script") || str.includes("javascript:")) {
+        throw new Error("Invalid input detected");
+      }
+    }
+
     if (config.data instanceof FormData) delete config.headers["Content-Type"];
     else if (!config.headers["Content-Type"]) config.headers["Content-Type"] = "application/json";
-  } catch {}
+  } catch (e) {
+    if (e.message === "Invalid input detected") throw e;
+  }
   return config;
 });
 
@@ -40,13 +58,14 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
     if (!error.response) {
-      error.userMessage = "Server se connect nahi ho pa raha.";
+      error.userMessage = "Server se connect nahi ho pa raha. Internet check karo.";
       return Promise.reject(error);
     }
     const status = error.response.status;
     const msg = (error.response.data?.message || error.response.data?.detail || "").toLowerCase();
     const isTokenError = status === 401 && (msg.includes("token") || msg.includes("unauthorized") || msg.includes("expired") || msg.includes("invalid") || msg === "");
     const isAuthUrl = original?.url?.includes("/login") || original?.url?.includes("/register") || original?.url?.includes("/token");
+
     if (isTokenError &&!isAuthUrl) {
       if (original._retry) { logoutAndRedirect(); return Promise.reject(error); }
       if (isRefreshing) {
@@ -79,15 +98,23 @@ api.interceptors.response.use(
       await new Promise(r=> setTimeout(r, 1000));
       return api(original);
     }
-    if (status >= 500) error.userMessage = "Server error.";
-    else if (status === 429) error.userMessage = "Bohot requests.";
-    else if (status === 404) error.userMessage = "Not found.";
+    // SECURITY: User friendly messages - hacker ko detail mat do
+    if (status >= 500) error.userMessage = "Server me kuch problem hai. 1 min baad try karo.";
+    else if (status === 429) error.userMessage = "Bohot tez requests bhej rahe ho. Thoda ruko!";
+    else if (status === 404) error.userMessage = "Ye cheez mili nahi.";
+    else if (status === 403) error.userMessage = "Aapko iska permission nahi hai.";
     return Promise.reject(error);
   }
 );
 
-function logoutAndRedirect() {
+// SECURITY: Logout backend ko bhi bolo - token blacklist
+async function logoutAndRedirect() {
   try {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (refreshToken) {
+      // Backend ko bolo token blacklist kar de - fire and forget
+      api.post("auth/logout/", { refresh: refreshToken }).catch(()=>{});
+    }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
@@ -101,23 +128,46 @@ function logoutAndRedirect() {
   } catch {}
 }
 
+// SECURITY: Image URL validation - XSS se bacho
+// SECURITY: Image URL validation - XSS se bacho
 export const getImageUrl = (path) => {
   try {
     if (!path) return "";
-    if (typeof path!== "string") { path = path.image || path.url || path.src || ""; if (!path) return ""; }
-    if (path.startsWith("http")) return path;
-    if (path.startsWith("//")) return `https:${path}`;
-    if (path.startsWith("/media")) return `${IMAGE_BASE}${path}`;
-    if (path.startsWith("media/")) return `${IMAGE_BASE}/${path}`;
-    if (path.startsWith("/")) return `${IMAGE_BASE}${path}`;
-    return `${IMAGE_BASE}/media/${path.replace(/^\/+/, "")}`;
-  } catch { return ""; }
+    if (typeof path !== "string") {
+      path = path.image || path.url || path.src || "";
+      if (!path) return "";
+    }
+    // Block dangerous urls
+    const lower = path.toLowerCase();
+    if (lower.includes("javascript:") || lower.includes("data:text")) return "";
+    
+    if (lower.startsWith("http")) {
+      if (lower.startsWith("https://")) return path;
+      if (lower.includes("localhost") || lower.includes("127.0.0.1")) return path;
+      return "";
+    }
+    if (path.startsWith("//")) {
+      return "https:" + path;
+    }
+    if (path.startsWith("/media")) {
+      return IMAGE_BASE + path;
+    }
+    if (path.startsWith("media/")) {
+      return IMAGE_BASE + "/" + path;
+    }
+    if (path.startsWith("/")) {
+      return IMAGE_BASE + path;
+    }
+    return IMAGE_BASE + "/media/" + path.replace(/^\/+/, "");
+  } catch {
+    return "";
+  }
 };
 
 export const resolveProductImage = (product) => {
   try {
     if (!product) return "https://via.placeholder.com/400x400?text=No+Image";
-    if (product.images && Array.isArray(product.images) && product.images.length>0) return getImageUrl(product.images[0]);
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) return getImageUrl(product.images[0]);
     if (product.image) return getImageUrl(product.image);
     if (product.thumbnail) return getImageUrl(product.thumbnail);
   } catch {}
@@ -129,7 +179,7 @@ export const isPrimeProduct = (product) => {
 };
 
 export const getDiscountPercent = (product) => {
-  try { const price = Number(product?.price || 0); const mrp = Number(product?.original_price || product?.mrp || 0); if (mrp>price && mrp>0) return Math.round((1-price/mrp)*100); } catch {}
+  try { const price = Number(product?.price || 0); const mrp = Number(product?.original_price || product?.mrp || 0); if (mrp > price && mrp > 0) return Math.round((1 - price / mrp) * 100); } catch {}
   return 0;
 };
 

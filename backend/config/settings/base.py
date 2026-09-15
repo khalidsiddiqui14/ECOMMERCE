@@ -1,32 +1,26 @@
 import os
 from pathlib import Path
-
+from datetime import timedelta # ADD KIYA
 from dotenv import load_dotenv
-
 
 # Project root directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
 load_dotenv(BASE_DIR / ".env")
 
-
-# Django secret key
+# Django secret key - FIXED: .env me SECRET_KEY hai, DJANGO_SECRET_KEY nahi
 SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
+    "SECRET_KEY", # <-- YE CHANGE KIYA
     "development-secret-key-change-this-in-local-environment-2026",
 )
 
-
 # Debug is disabled by default.
-# development.py explicitly enables it.
 DEBUG = (
     os.environ.get(
         "DJANGO_DEBUG",
-        "False",
+        os.environ.get("DEBUG", "False"), # Dono support karega
     ).lower()
     == "true"
 )
-
 
 # Allowed hostnames
 ALLOWED_HOSTS = [
@@ -38,14 +32,9 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
-render_hostname = os.environ.get(
-    "RENDER_EXTERNAL_HOSTNAME"
-)
-
+render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 if render_hostname:
-    ALLOWED_HOSTS.append(
-        render_hostname
-    )
+    ALLOWED_HOSTS.append(render_hostname)
 
 # Installed Django and third-party applications
 INSTALLED_APPS = [
@@ -58,6 +47,7 @@ INSTALLED_APPS = [
 
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist", # SECURITY ADD - JWT Blacklist
     "django_filters",
     "corsheaders",
     "drf_spectacular",
@@ -78,9 +68,8 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.addresses",
     "apps.admin_panel",
-
+    "apps.ai",
 ]
-
 
 # Middleware
 MIDDLEWARE = [
@@ -94,17 +83,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-
-# Root URL configuration
 ROOT_URLCONF = "config.urls"
-
-
-# WSGI / ASGI applications
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-
-# Django template configuration
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -120,15 +102,9 @@ TEMPLATES = [
     },
 ]
 
-
-# Database configuration
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-)
-
+DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL:
     import dj_database_url
-
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
@@ -143,180 +119,132 @@ else:
         }
     }
 
-
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "UserAttributeSimilarityValidator"
-        ),
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
-        ),
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "CommonPasswordValidator"
-        ),
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "NumericPasswordValidator"
-        ),
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# Internationalization
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files
 STATIC_URL = "/static/"
-
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-
-# Media files
 MEDIA_URL = "/media/"
-
 MEDIA_ROOT = BASE_DIR / "media"
-
-
-# Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-
-# Custom user model
 AUTH_USER_MODEL = "accounts.User"
 
+# ============== SECURITY FIXES START ==============
 
-# Django REST Framework
+# 1. JWT SECURE CONFIG
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# 2. CACHE FOR OTP RATE LIMIT
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "shopzone-cache",
+    }
+}
+
+# 3. GEMINI API KEY
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# ============== SECURITY FIXES END ==============
+
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
-    ),
+    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticatedOrReadOnly",),
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
-    "DEFAULT_PAGINATION_CLASS": (
-        "rest_framework.pagination.PageNumberPagination"
-    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
-    "EXCEPTION_HANDLER": (
-        "config.exceptions.custom_exception_handler"
-    ),
-    "DEFAULT_SCHEMA_CLASS": (
-        "drf_spectacular.openapi.AutoSchema"
-    ),
+    "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-
-# OpenAPI / Swagger
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ecommerce API",
     "DESCRIPTION": "Production Ecommerce REST API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
-
-    "AUTHENTICATION_WHITELIST": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ],
-
-    "SWAGGER_UI_SETTINGS": {
-        "persistAuthorization": True,
-    },
+    "AUTHENTICATION_WHITELIST": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
 
-
-# CORS
+# CORS - FROM ENV + DEFAULT
 CORS_ALLOW_ALL_ORIGINS = False
-# CORS
-CORS_ALLOW_ALL_ORIGINS = False
-
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://ecommerce-frontend-bc57.onrender.com",
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://ecommerce-frontend-bc57.onrender.com"
+    ).split(",")
+    if origin.strip()
 ]
-
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://ecommerce-frontend-bc57.onrender.com",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    origin.strip()
+    for origin in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://ecommerce-frontend-bc57.onrender.com,http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
 ]
 
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 CORS_ALLOW_HEADERS = ["*"]
 
-
 # Basic security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
-
 X_FRAME_OPTIONS = "DENY"
 
-
-# Custom test runner
 TEST_RUNNER = "config.test_runner.CustomTestRunner"
 
-
-# Application logging
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": (
-                "{levelname} {asctime} "
-                "{name} {message}"
-            ),
-            "style": "{",
-        },
-        "simple": {
-            "format": "{levelname} {message}",
-            "style": "{",
-        },
+        "verbose": {"format": "{levelname} {asctime} {name} {message}", "style": "{"},
+        "simple": {"format": "{levelname} {message}", "style": "{"},
     },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-    },
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
-        },
-        "django.server": {
-            "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
-        },
+        "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.server": {"handlers": ["console"], "level": "ERROR", "propagate": False},
     },
 }
+
+GOOGLE_CLIENT_ID = os.environ.get(
+    "GOOGLE_CLIENT_ID",
+    "791675486099-4c4ag08kjp4u10ei01imbldt2tg97vi2.apps.googleusercontent.com"
+)
+
+GOOGLE_CLIENT_SECRET = os.environ.get(
+    "GOOGLE_CLIENT_SECRET",
+    ""  # ENV se aayega
+)
+
+# Frontend URL for redirects
+FRONTEND_URL = os.environ.get(
+    "FRONTEND_URL",
+    "http://localhost:5173"
+)
