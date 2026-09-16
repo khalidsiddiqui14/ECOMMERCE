@@ -1,5 +1,4 @@
 from django.shortcuts import get_object_or_404
-
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -16,15 +15,10 @@ class StoreCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsVendor]
 
     def perform_create(self, serializer):
-        vendor = get_object_or_404(
-            Vendor,
-            user=self.request.user,
-        )
+        vendor = get_object_or_404(Vendor, user=self.request.user)
 
         if Store.objects.filter(vendor=vendor).exists():
-            raise ValidationError(
-                "Store already exists for this vendor."
-            )
+            raise ValidationError("You already have a store.")
 
         serializer.save(vendor=vendor)
 
@@ -34,12 +28,5 @@ class StoreDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated, IsVendor]
 
     def get_object(self):
-        vendor = get_object_or_404(
-            Vendor,
-            user=self.request.user,
-        )
-
-        return get_object_or_404(
-            Store,
-            vendor=vendor,
-        )
+        vendor = get_object_or_404(Vendor, user=self.request.user)
+        return get_object_or_404(Store, vendor=vendor)

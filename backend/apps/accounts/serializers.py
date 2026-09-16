@@ -1,9 +1,9 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from django.core.validators import FileExtensionValidator
 
 from .models import User
-
 
 class RegisterSerializer(serializers.ModelSerializer):
     # Validate and hash the user's password
@@ -69,27 +69,32 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         return user
 
-
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(
+        write_only=True,
+    )
 
     def validate(self, attrs):
-        email = attrs.get("email")
-        password = attrs.get("password")
+        email = attrs.get("email", "").strip().lower()
+        password = attrs.get("password", "")
 
-        user = User.objects.filter(
-            email__iexact=email
-        ).first()
+        request = self.context.get("request")
 
-        if not user:
+        user = authenticate(
+            request=request,
+            username=email,
+            password=password,
+        )
+
+        if user is None:
             raise serializers.ValidationError(
                 "Invalid email or password."
             )
 
-        if not user.check_password(password):
+        if not user.is_active:
             raise serializers.ValidationError(
-                "Invalid email or password."
+                "This account is inactive."
             )
 
         attrs["user"] = user
@@ -115,6 +120,20 @@ class UserSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def validate_profile_image(self, value):
+        if value:
+            if value.size > 2 * 1024 * 1024:
+                raise serializers.ValidationError(
+                    "Profile image size must be less than 2MB"
+                )
+            ext = value.name.split('.')[-1].lower()
+            if ext not in ['jpg', 'jpeg', 'png', 'webp']:
+                raise serializers.ValidationError(
+                    "Only jpg, jpeg, png, webp files allowed"
+                )
+        return value
+
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(
         write_only=True

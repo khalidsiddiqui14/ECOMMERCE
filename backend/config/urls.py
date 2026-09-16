@@ -7,8 +7,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-
+    path('khalid-secure-2026/', admin.site.urls),
     # API documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(

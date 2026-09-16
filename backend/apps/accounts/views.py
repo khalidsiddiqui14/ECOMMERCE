@@ -3,8 +3,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from django.core.cache import cache
@@ -18,6 +19,7 @@ from.serializers import (
 )
 from.utils import send_otp_email, send_otp_sms
 import random
+import hmac
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -34,7 +36,8 @@ class LoginView(APIView):
     )
     def post(self, request):
         serializer = LoginSerializer(
-            data=request.data,
+        data=request.data,
+        context={"request": request},
         )
         serializer.is_valid(
             raise_exception=True,
@@ -137,6 +140,7 @@ def get_tokens_for_user(user):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AnonRateThrottle])
 def send_otp(request):
     identifier = request.data.get('email_or_phone', '').strip()
 
@@ -145,6 +149,15 @@ def send_otp(request):
             "success": False,
             "message": "Please enter email or phone number!"
         }, status=400)
+
+    ip = request.META.get('REMOTE_ADDR', '')
+    ip_key = f"otp_ip_{ip}"
+    ip_count = cache.get(ip_key, 0)
+    if ip_count >= 10:
+        return Response({
+            "success": False,
+            "message": "Too many requests from this IP! Try after 1 hour"
+        }, status=429)
 
     # --- SECURITY 1: RATE LIMIT 3 per 5 min ---
     cache_key = f"otp_limit_{identifier}"
@@ -162,6 +175,7 @@ def send_otp(request):
     OTP.objects.create(email_or_phone=identifier, otp_code=otp_code, attempts=0, is_used=False)
 
     cache.set(cache_key, count + 1, 300)
+    cache.set(ip_key, ip_count + 1, 3600)
 
     is_email = '@' in identifier
     if is_email:
@@ -188,6 +202,7 @@ def send_otp(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AnonRateThrottle])
 def verify_otp(request):
     identifier = request.data.get('email_or_phone', '').strip()
     otp_input = request.data.get('otp', '').strip()
@@ -226,7 +241,7 @@ def verify_otp(request):
             "message": "Too many wrong attempts! Request new OTP"
         }, status=400)
 
-    if otp_obj.otp_code!= otp_input:
+    if not hmac.compare_digest(str(otp_obj.otp_code), str(otp_input)):
         otp_obj.attempts += 1
         otp_obj.save()
         return Response({
