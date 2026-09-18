@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: ecommerce-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ecommerce_media:/app/media
+      - ecommerce_db:/app/data
+    environment:
+      DJANGO_DEBUG: "1"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ecommerce-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ecommerce_media:
+  ecommerce_db:
