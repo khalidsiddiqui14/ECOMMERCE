@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const secondaryItems = [
@@ -22,15 +22,42 @@ const secondaryItems = [
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [user, setUser] = useState(() => {
+    try {
+      const s = localStorage.getItem("user");
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const s = localStorage.getItem("user");
+        setUser(s ? JSON.parse(s) : null);
+      } catch { setUser(null); }
+    };
+    load();
+    window.addEventListener("auth-change", load);
+    return () => window.removeEventListener("auth-change", load);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("user_role");
+    localStorage.removeItem("is_admin");
+    localStorage.removeItem("recent_searches");
+    setUser(null);
+    window.dispatchEvent(new Event("auth-change"));
+    window.location.href = "/login";
+  };
 
   return (
     <>
-      {/* TOP HEADER - AMAZON BLACK */}
       <header style={{ background: "#131921", color: "white", position: "sticky", top: 0, zIndex: 100 }}>
-        {/* Row 1 */}
         <div style={{ height: "60px", display: "flex", alignItems: "center", gap: "8px", padding: "0 10px" }}>
-          
-          {/* Logo */}
           <Link to="/" style={{ display: "flex", alignItems: "center", padding: "6px 8px", border: "1px solid transparent", textDecoration: "none", color: "white" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
@@ -39,7 +66,6 @@ export default function Header() {
             <span style={{ fontSize: "22px", fontWeight: "bold", color: "#febd69", marginLeft: "4px" }}>zone</span>
           </Link>
 
-          {/* Deliver to */}
           <div style={{ padding: "6px 8px", border: "1px solid transparent", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
@@ -51,7 +77,6 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Search Bar - Center */}
           <div style={{ flex: 1, display: "flex", height: "40px", borderRadius: "4px", overflow: "hidden", margin: "0 12px" }}>
             <div style={{ background: "#e6e6e6", color: "#555", padding: "0 10px", display: "grid", placeItems: "center", fontSize: "12px", borderRight: "1px solid #ddd" }}>
               All <span style={{ fontSize: "10px", marginLeft: "4px" }}>▼</span>
@@ -65,7 +90,6 @@ export default function Header() {
             <button style={{ background: "#febd69", border: "none", padding: "0 16px", cursor: "pointer", fontSize: "18px" }}>🔍</button>
           </div>
 
-          {/* EN */}
           <div style={{ padding: "8px", border: "1px solid transparent", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
@@ -73,16 +97,43 @@ export default function Header() {
             <span>🇮🇳</span><span style={{ fontSize: "14px", fontWeight: "bold" }}>EN</span><span style={{ fontSize: "10px" }}>▼</span>
           </div>
 
-          {/* Account & Lists */}
-          <Link to="/login" style={{ padding: "6px 8px", border: "1px solid transparent", textDecoration: "none", color: "white", lineHeight: "14px" }}
-            onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
-            onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
+          <div style={{ position: "relative" }}
+            onMouseEnter={e => {
+              const menu = e.currentTarget.querySelector(".account-menu");
+              if (menu) menu.style.display = "block";
+            }}
+            onMouseLeave={e => {
+              const menu = e.currentTarget.querySelector(".account-menu");
+              if (menu) menu.style.display = "none";
+            }}
           >
-            <div style={{ fontSize: "12px" }}>Hello, sign in</div>
-            <div style={{ fontSize: "14px", fontWeight: "bold" }}>Account & Lists <span style={{ fontSize: "10px" }}>▼</span></div>
-          </Link>
+            <div style={{ padding: "6px 8px", border: "1px solid transparent", color: "white", lineHeight: "14px", cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
+              onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
+            >
+              <div style={{ fontSize: "12px" }}>Hello, {user?.username?.slice(0,10) || user?.email?.split("@")[0]?.slice(0,10) || "sign in"}</div>
+              <div style={{ fontSize: "14px", fontWeight: "bold" }}>Account & Lists <span style={{ fontSize: "10px" }}>▼</span></div>
+            </div>
 
-          {/* Returns */}
+            <div className="account-menu" style={{ display: "none", position: "absolute", top: "100%", right: 0, width: "230px", background: "white", color: "#111", padding: "12px", borderRadius: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.3)", zIndex: 9999 }}>
+              {user ? (
+                <>
+                  <div style={{ padding: "8px 9px", borderBottom: "1px solid #ddd", marginBottom: "6px" }}>
+                    <div style={{ fontSize: "13px", color: "#666" }}>Signed in as</div>
+                    <div style={{ fontSize: "15px", fontWeight: "bold" }}>{user.username || user.email}</div>
+                  </div>
+                  <Link to="/profile" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Account</Link>
+                  <Link to="/orders" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Orders</Link>
+                  <Link to="/wishlist" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Wish List</Link>
+                  <div style={{ borderTop: "1px solid #ddd", margin: "8px 0" }} />
+                  <button onClick={handleLogout} style={{ width: "100%", padding: "9px", background: "#FFD814", border: "1px solid #FCD200", borderRadius: "4px", fontWeight: "bold", cursor: "pointer" }}>Sign out</button>
+                </>
+              ) : (
+                <Link to="/login" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none", fontWeight: "bold" }}>Sign in</Link>
+              )}
+            </div>
+          </div>
+
           <Link to="/orders" style={{ padding: "6px 8px", border: "1px solid transparent", textDecoration: "none", color: "white", lineHeight: "14px" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
@@ -91,7 +142,6 @@ export default function Header() {
             <div style={{ fontSize: "14px", fontWeight: "bold" }}>& Orders</div>
           </Link>
 
-          {/* Cart */}
           <Link to="/cart" style={{ padding: "6px 8px", border: "1px solid transparent", display: "flex", alignItems: "end", gap: "2px", textDecoration: "none", color: "white" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
@@ -100,7 +150,6 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* SECONDARY NAV - 39px - Amazon exact */}
         <div style={{
           background: "#232f3e",
           height: "39px",
@@ -139,14 +188,13 @@ export default function Header() {
         </div>
       </header>
 
-      {/* Drawer */}
       {open && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)" }} onClick={() => setOpen(false)} />
           <div style={{ position: "relative", width: "365px", maxWidth: "80vw", height: "100vh", background: "white", overflowY: "auto" }}>
             <div style={{ background: "#232f3e", color: "white", padding: "12px 24px", display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ width: "27px", height: "27px", background: "white", borderRadius: "50%", display: "grid", placeItems: "center" }}>👤</div>
-              <span style={{ fontSize: "19px", fontWeight: "bold" }}>Hello, sign in</span>
+              <span style={{ fontSize: "19px", fontWeight: "bold" }}>{user ? `Hello, ${user.username || user.email}` : "Hello, sign in"}</span>
               <button onClick={() => setOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "white", fontSize: "24px", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ padding: "12px 0" }}>
