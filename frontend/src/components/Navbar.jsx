@@ -183,25 +183,41 @@ function Navbar() {
             )}
           </form>
 
-          <div className="flex items-center gap-2 md:gap-4 ml-auto text-">
-            {!user? (
-              <Link to="/login" className="leading-tight hover:outline hover:outline-1 p-2 rounded- hidden md:block">
-                <div className="text-">Hello, sign in</div>
-                <div className="font-bold text-">Account & Lists ▾</div>
-              </Link>
-            ) : (
-              <div className="leading-tight group relative">
-                <div className="text- hidden md:block">Hello, {user.username?.slice(0,10) || user.email?.split("@")[0]?.slice(0,10)}</div>
-                <Link to="/profile" className="font-bold text- hover:underline hidden md:block">Account & Lists ▾</Link>
-                {/* Dropdown */}
-                <div className="hidden group-hover:block absolute top- right-0 bg-white text-black w- rounded- shadow-xl border border-[#d5d9d9] p-3 z-50">
-                  <Link to="/profile" className="block text- py-1 hover:text-[#E77600]">Your Account</Link>
-                  <Link to="/orders" className="block text- py-1 hover:text-[#E77600]">Your Orders</Link>
-                  <Link to="/wishlist" className="block text- py-1 hover:text-[#E77600]">Your Wish List</Link>
-                  <button onClick={handleLogout} className="w-full mt-2 h-7 bg-[#FFD814] rounded- text- border border-[#FCD200]">Sign out</button>
-                </div>
-              </div>
-            )}
+          <div className="flex items-center gap-2 md:gap-4 ml-auto text-sm">
+      {!user ? (
+        <Link to="/login" className="leading-tight hover:outline hover:outline-1 p-2 rounded hidden md:block">
+          <div className="text-xs">Hello, sign in</div>
+          <div className="font-bold text-sm">Account & Lists ▾</div>
+        </Link>
+      ) : (
+        <div className="leading-tight group relative">
+          <div className="p-2 cursor-pointer hover:outline hover:outline-1 rounded">
+            <div className="text-xs">
+              Hello, {user.username?.slice(0,10) || user.email?.split("@")[0]?.slice(0,10)}
+            </div>
+            <div className="font-bold text-sm">Account & Lists ▾</div>
+          </div>
+
+          <div className="hidden group-hover:block absolute top-full right-0 mt-1 bg-white text-black w-56 rounded-md shadow-xl border border-[#d5d9d9] p-3 z-[100]">
+            <Link to="/profile" className="block text-sm py-2 px-2 hover:bg-[#f0f2f2] hover:text-[#E77600] rounded">
+              Your Account
+            </Link>
+            <Link to="/orders" className="block text-sm py-2 px-2 hover:bg-[#f0f2f2] hover:text-[#E77600] rounded">
+              Your Orders
+            </Link>
+            <Link to="/wishlist" className="block text-sm py-2 px-2 hover:bg-[#f0f2f2] hover:text-[#E77600] rounded">
+              Your Wish List
+            </Link>
+            <div className="border-t border-gray-200 my-2"></div>
+            <button
+              onClick={handleLogout}
+              className="w-full mt-1 h-8 bg-[#FFD814] hover:bg-[#F7CA00] rounded-md text-sm font-bold border border-[#FCD200]"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
 
             <Link to="/orders" className="hidden md:block leading-tight hover:outline hover:outline-1 p-2 rounded-">
               <div className="text-">Returns</div>
