@@ -10,13 +10,11 @@ function Navbar() {
   const activeDeals = searchParams.get("deals") === "true" || searchParams.get("deal") === "today";
 
   const [user, setUser] = useState(() => {
-    try {
-      const t = localStorage.getItem("access_token");
-      const s = localStorage.getItem("user");
-      if (!t ||!s) return null;
-      return JSON.parse(s);
-    } catch { return null; }
-  });
+  try {
+    const s = localStorage.getItem("user");
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
+});
   const [cartCount, setCartCount] = useState(0);
   const [searchQ, setSearchQ] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -28,12 +26,11 @@ function Navbar() {
 
   useEffect(() => {
     const load = () => {
-      try {
-        const t = localStorage.getItem("access_token");
-        const s = localStorage.getItem("user");
-        setUser(!t ||!s? null : JSON.parse(s));
-      } catch { setUser(null); }
-    };
+  try {
+    const s = localStorage.getItem("user");
+    setUser(s ? JSON.parse(s) : null);
+  } catch { setUser(null); }
+};
     const onCart = async () => {
       try { setCartCount(await getCartCount()); } catch { setCartCount(0); }
     };
