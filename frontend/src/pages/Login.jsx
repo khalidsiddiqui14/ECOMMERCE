@@ -20,8 +20,7 @@ function Login() {
   const [otpSent, setOtpSent] = useState(false);
   const [testOtp, setTestOtp] = useState("");
 
-  const API = "http://127.0.0.1:8000/api/auth";
-
+const API = `${import.meta.env.VITE_API_URL}auth`;
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setError("");
