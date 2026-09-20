@@ -20,5 +20,5 @@ router.register(r'settings', SiteConfigurationViewSet, basename='admin-settings'
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('dashboard/stats/', AdminDashboardView.as_view(), name='admin-dashboard-stats'),
+    path('dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
 ]
