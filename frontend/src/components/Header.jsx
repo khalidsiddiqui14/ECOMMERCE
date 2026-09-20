@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const secondaryItems = [
   { l: "All", icon: "☰", isAll: true },
@@ -20,8 +20,10 @@ const secondaryItems = [
 ];
 
 export default function Header() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [cartCount, setCartCount] = useState(0);
   const [user, setUser] = useState(() => {
     try {
       const s = localStorage.getItem("user");
@@ -36,9 +38,28 @@ export default function Header() {
         setUser(s ? JSON.parse(s) : null);
       } catch { setUser(null); }
     };
+
+    const loadCart = () => {
+      try {
+        const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+        setCartCount(Array.isArray(cart) ? cart.reduce((total, item) => total + Number(item.quantity || 1), 0) : 0);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
     load();
+    loadCart();
+
     window.addEventListener("auth-change", load);
-    return () => window.removeEventListener("auth-change", load);
+    window.addEventListener("cart-change", loadCart);
+    window.addEventListener("storage", loadCart);
+
+    return () => {
+      window.removeEventListener("auth-change", load);
+      window.removeEventListener("cart-change", loadCart);
+      window.removeEventListener("storage", loadCart);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -53,6 +74,17 @@ export default function Header() {
     window.dispatchEvent(new Event("auth-change"));
     window.location.href = "/login";
   };
+
+  const handleSearch = e => {
+    e.preventDefault();
+    const value = search.trim();
+    if (!value) return;
+    navigate(`/search?q=${encodeURIComponent(value)}`);
+    setSearch("");
+  };
+
+  const isAdmin = user?.role === "ADMIN" || user?.is_staff === true || user?.is_superuser === true;
+  const isVendor = user?.role === "VENDOR" || isAdmin;
 
   return (
     <>
@@ -77,7 +109,7 @@ export default function Header() {
             </div>
           </div>
 
-          <div style={{ flex: 1, display: "flex", height: "40px", borderRadius: "4px", overflow: "hidden", margin: "0 12px" }}>
+          <form onSubmit={handleSearch} style={{ flex: 1, display: "flex", height: "40px", borderRadius: "4px", overflow: "hidden", margin: "0 12px" }}>
             <div style={{ background: "#e6e6e6", color: "#555", padding: "0 10px", display: "grid", placeItems: "center", fontSize: "12px", borderRight: "1px solid #ddd" }}>
               All <span style={{ fontSize: "10px", marginLeft: "4px" }}>▼</span>
             </div>
@@ -87,8 +119,8 @@ export default function Header() {
               placeholder="Search shopzone - mobiles, laptops, fashion..."
               style={{ flex: 1, border: "none", padding: "0 10px", fontSize: "15px", outline: "none" }}
             />
-            <button style={{ background: "#febd69", border: "none", padding: "0 16px", cursor: "pointer", fontSize: "18px" }}>🔍</button>
-          </div>
+            <button type="submit" style={{ background: "#febd69", border: "none", padding: "0 16px", cursor: "pointer", fontSize: "18px" }}>🔍</button>
+          </form>
 
           <div style={{ padding: "8px", border: "1px solid transparent", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
@@ -121,11 +153,26 @@ export default function Header() {
                   <div style={{ padding: "8px 9px", borderBottom: "1px solid #ddd", marginBottom: "6px" }}>
                     <div style={{ fontSize: "13px", color: "#666" }}>Signed in as</div>
                     <div style={{ fontSize: "15px", fontWeight: "bold" }}>{user.username || user.email}</div>
+                    {user.role && <div style={{ fontSize: "12px", color: "#666", marginTop: "3px" }}>{user.role}</div>}
                   </div>
+
                   <Link to="/profile" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Account</Link>
                   <Link to="/orders" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Orders</Link>
                   <Link to="/wishlist" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none" }}>Your Wish List</Link>
+
+                  {isVendor && (
+                    <Link to="/vendor/dashboard" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none", fontWeight: "bold" }}>Vendor Dashboard</Link>
+                  )}
+
+                  {isAdmin && (
+                    <>
+                      <Link to="/admin" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none", fontWeight: "bold" }}>Admin Panel</Link>
+                      <Link to="/admin/dashboard" style={{ display: "block", padding: "9px", color: "#111", textDecoration: "none", fontWeight: "bold" }}>Admin Dashboard</Link>
+                    </>
+                  )}
+
                   <div style={{ borderTop: "1px solid #ddd", margin: "8px 0" }} />
+
                   <button onClick={handleLogout} style={{ width: "100%", padding: "9px", background: "#FFD814", border: "1px solid #FCD200", borderRadius: "4px", fontWeight: "bold", cursor: "pointer" }}>Sign out</button>
                 </>
               ) : (
@@ -146,7 +193,11 @@ export default function Header() {
             onMouseEnter={e => e.currentTarget.style.border = "1px solid white"}
             onMouseLeave={e => e.currentTarget.style.border = "1px solid transparent"}
           >
-            <span style={{ fontSize: "28px" }}>🛒</span><span style={{ fontSize: "14px", fontWeight: "bold" }}>0</span>
+            <span style={{ fontSize: "28px", position: "relative" }}>
+              🛒
+              {cartCount > 0 && <span style={{ position: "absolute", top: "-5px", right: "-8px", background: "#f08804", color: "white", borderRadius: "50%", minWidth: "18px", height: "18px", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "bold" }}>{cartCount}</span>}
+            </span>
+            <span style={{ fontSize: "14px", fontWeight: "bold" }}>Cart</span>
           </Link>
         </div>
 
@@ -165,7 +216,12 @@ export default function Header() {
             <Link
               key={i}
               to={it.path || "/"}
-              onClick={(e) => { if (it.isAll) { e.preventDefault(); setOpen(true); } }}
+              onClick={e => {
+                if (it.isAll) {
+                  e.preventDefault();
+                  setOpen(true);
+                }
+              }}
               style={{
                 color: "white",
                 textDecoration: "none",
@@ -191,19 +247,48 @@ export default function Header() {
       {open && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)" }} onClick={() => setOpen(false)} />
+
           <div style={{ position: "relative", width: "365px", maxWidth: "80vw", height: "100vh", background: "white", overflowY: "auto" }}>
             <div style={{ background: "#232f3e", color: "white", padding: "12px 24px", display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ width: "27px", height: "27px", background: "white", borderRadius: "50%", display: "grid", placeItems: "center" }}>👤</div>
               <span style={{ fontSize: "19px", fontWeight: "bold" }}>{user ? `Hello, ${user.username || user.email}` : "Hello, sign in"}</span>
               <button onClick={() => setOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "white", fontSize: "24px", cursor: "pointer" }}>×</button>
             </div>
+
             <div style={{ padding: "12px 0" }}>
               <h3 style={{ padding: "12px 24px", fontSize: "18px", fontWeight: "bold" }}>Shop by Department</h3>
-              {["Electronics", "Fashion", "Home & Kitchen", "Beauty", "Today's Deals", "Mobiles", "Prime", "Wishlist"].map(t => (
-                <Link key={t} to={`/category/${t.toLowerCase().replace(/ /g,"-")}`} onClick={()=>setOpen(false)} style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px" }}>
+
+              {["Electronics", "Fashion", "Home & Kitchen", "Beauty", "Today's Deals", "Mobiles", "Prime"].map(t => (
+                <Link
+                  key={t}
+                  to={t === "Today's Deals" ? "/deals" : t === "Prime" ? "/prime" : `/category/${t.toLowerCase().replace(/ /g, "-")}`}
+                  onClick={() => setOpen(false)}
+                  style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px" }}
+                >
                   {t} <span>›</span>
                 </Link>
               ))}
+
+              <Link to="/wishlist" onClick={() => setOpen(false)} style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px" }}>
+                Wishlist <span>›</span>
+              </Link>
+
+              {isVendor && (
+                <Link to="/vendor/dashboard" onClick={() => setOpen(false)} style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px", fontWeight: "bold" }}>
+                  Vendor Dashboard <span>›</span>
+                </Link>
+              )}
+
+              {isAdmin && (
+                <>
+                  <Link to="/admin" onClick={() => setOpen(false)} style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px", fontWeight: "bold" }}>
+                    Admin Panel <span>›</span>
+                  </Link>
+                  <Link to="/admin/dashboard" onClick={() => setOpen(false)} style={{ display: "flex", justifyContent: "space-between", padding: "12px 24px", textDecoration: "none", color: "#111", fontSize: "14px", fontWeight: "bold" }}>
+                    Admin Dashboard <span>›</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
