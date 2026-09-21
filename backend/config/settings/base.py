@@ -165,6 +165,7 @@ CACHES = {
 
 # 3. GEMINI API KEY
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+FAST2SMS_API_KEY = os.environ.get("FAST2SMS_API_KEY", "")
 
 # ============== SECURITY FIXES END ==============
 
