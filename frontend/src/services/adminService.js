@@ -78,7 +78,7 @@ export const AdminService = {
   // Users — list, detail, toggle active, delete, ban
   users: (params = {}) => unwrap(adminApi.get("/users/", { params })),
   userDetail: (id) => unwrap(adminApi.get(`/users/${id}/`)),
-  toggleUser: (id) => unwrap(adminApi.post(`/users/${id}/toggle-active/`)),
+  toggleUser: (id, isActive) => unwrap(adminApi.patch(`/users/${id}/${isActive ? "deactivate" : "activate"}/`)),
   banUser: (id, reason) => unwrap(adminApi.post(`/users/${id}/ban/`, { reason })),
   deleteUser: (id) => unwrap(adminApi.delete(`/users/${id}/`)),
 
