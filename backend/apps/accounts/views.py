@@ -276,8 +276,13 @@ def verify_otp(request):
             }
         )
 
-    tokens = get_tokens_for_user(user)
+    if not user.is_active:
+      return Response({
+        "success": False,
+        "message": "This account is inactive. Please contact an administrator."
+      }, status=403)
 
+    tokens = get_tokens_for_user(user)
     return Response({
         "success": True,
         "message": "Login Successful! 🎉",
@@ -320,6 +325,12 @@ def google_login(request):
                 'first_name': name,
             }
         )
+
+        if not user.is_active:
+          return Response({
+            "success": False,
+            "message": "This account is inactive. Please contact an administrator."
+        }, status=403)
 
         tokens = get_tokens_for_user(user)
 

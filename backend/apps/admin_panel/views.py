@@ -57,7 +57,6 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     def deactivate(self, request, pk=None):
         user = self.get_object()
 
-        # Prevent an admin from accidentally deactivating themselves
         if user.id == request.user.id:
             return Response(
                 {'error': 'You cannot deactivate your own admin account.'},
