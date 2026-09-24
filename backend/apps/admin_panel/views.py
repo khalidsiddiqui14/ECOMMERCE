@@ -53,6 +53,39 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
     http_method_names = ['get', 'delete', 'patch', 'head', 'options']
 
+    @action(detail=True, methods=['patch'])
+    def deactivate(self, request, pk=None):
+        user = self.get_object()
+
+        # Prevent an admin from accidentally deactivating themselves
+        if user.id == request.user.id:
+            return Response(
+                {'error': 'You cannot deactivate your own admin account.'},
+                status=400
+            )
+
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+
+        return Response({
+            'message': 'User deactivated successfully.',
+            'user_id': user.id,
+            'is_active': user.is_active
+        })
+
+    @action(detail=True, methods=['patch'])
+    def activate(self, request, pk=None):
+        user = self.get_object()
+
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+        return Response({
+            'message': 'User activated successfully.',
+            'user_id': user.id,
+            'is_active': user.is_active
+        })
+
 class AdminActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AdminActivityLog.objects.all().order_by('-timestamp')
     serializer_class = AdminActivityLogSerializer
