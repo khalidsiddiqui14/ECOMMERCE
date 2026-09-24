@@ -22,7 +22,8 @@ export default function AIChatbot() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/ai/chat/", {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL?.replace(/\/api.*$/, "") || "http://127.0.0.1:8000";
+      const res = await fetch(`${API_BASE}/api/ai/chat/`,{
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg.text }),
