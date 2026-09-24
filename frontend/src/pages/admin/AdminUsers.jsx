@@ -24,10 +24,10 @@ export default function AdminUsers() {
 
   useEffect(() => { load(); }, [load]);
 
-  const toggle = async (id) => {
+  const toggle = async (id, isActive) => {
     setActionId(id);
     try {
-      await AdminService.toggleUser(id);
+      await AdminService.toggleUser(id, isActive);
       setData(prev => {
         const arr = prev.results || prev;
         const upd = (Array.isArray(arr)? arr : []).map(u=> u.id===id? {...u, is_active:!u.is_active} : u);
@@ -45,6 +45,20 @@ export default function AdminUsers() {
       await AdminService.banUser(id, reason);
       load();
     } catch (e) { alert(e.message); }
+    finally { setActionId(null); }
+  };
+
+  const deleteUser = async (id, email) => {
+    if (!confirm(`Delete user ${email}? This action cannot be undone.`)) return;
+    setActionId(id);
+    try {
+      await AdminService.deleteUser(id);
+      setData(prev => {
+        const arr = prev.results || prev;
+        const upd = (Array.isArray(arr)? arr : []).filter(u=>u.id!==id);
+        return Array.isArray(prev)? upd : {...prev, results: upd, count: Math.max(0, (prev.count || 0) - 1)};
+      });
+    } catch (e) { alert(e.message || "Delete failed"); }
     finally { setActionId(null); }
   };
 
@@ -82,7 +96,7 @@ export default function AdminUsers() {
           <option value="vendor">Vendors</option>
           <option value="staff">Staff / Admin</option>
         </select>
-        <span className="text- text-[#565959] self-center">Toggle active • Ban • Amazon style</span>
+        <span className="text- text-[#565959] self-center">Toggle active • Ban • Delete • Amazon style</span>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-auto mt-3">
@@ -99,8 +113,9 @@ export default function AdminUsers() {
                 <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded-full text- font-bold border ${u.is_active? 'bg-[#f0fdf4] text-[#067D62] border-[#bbf7d0]' : 'bg-[#fef2f2] text-[#CC0C39] border-[#fecaca]'}`}>{u.is_active? '✅ Active • Live' : '❌ Inactive • Blocked'}</span></td>
                 <td className="p-3">
                   <div className="flex gap-1 flex-wrap">
-                    <button onClick={()=>toggle(u.id)} disabled={actionId===u.id} className={`px-3 py-1 rounded- text- font-bold border disabled:opacity-50 ${u.is_active? 'bg-white hover:bg-[#fff0f0] text-[#CC0C39] border-[#fecaca]' : 'bg-[#067D62] text-white border-[#067D62] hover:bg-[#056b53]'}`}>{actionId===u.id? '...' : u.is_active? 'Deactivate' : 'Activate'}</button>
+                    <button onClick={()=>toggle(u.id, u.is_active)} disabled={actionId===u.id} className={`px-3 py-1 rounded- text- font-bold border disabled:opacity-50 ${u.is_active? 'bg-white hover:bg-[#fff0f0] text-[#CC0C39] border-[#fecaca]' : 'bg-[#067D62] text-white border-[#067D62] hover:bg-[#056b53]'}`}>{actionId===u.id? '...' : u.is_active? 'Deactivate' : 'Activate'}</button>
                     <button onClick={()=>ban(u.id)} disabled={actionId===u.id} className="px-2 py-1 bg-[#f0f2f2] border rounded- text- hover:bg-[#f7fafa]">Ban</button>
+                    <button onClick={()=>deleteUser(u.id, u.email)} disabled={actionId===u.id} className="px-2 py-1 bg-white text-[#CC0C39] border border-[#fecaca] rounded- text- font-bold hover:bg-[#fff0f0]">Delete</button>
                     <Link to={`/admin/users/${u.id}`} className="px-2 py-1 bg-white border rounded- text- grid place-items-center hover:bg-[#f7fafa]">View</Link>
                   </div>
                 </td>
