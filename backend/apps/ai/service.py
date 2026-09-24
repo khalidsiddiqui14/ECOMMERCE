@@ -39,7 +39,7 @@ Answer in 2-3 lines with price in Rs. If no relevant product, say "Aapko kya cha
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash",  # FIXED: Ye model exist karta hai ✅
+            model="gemini-3.5-flash",  # FIXED: Ye model exist karta hai ✅
             contents=prompt
         )
         # SECURITY: Response bhi limit karo
