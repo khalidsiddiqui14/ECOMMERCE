@@ -1,26 +1,20 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-
-const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*\/?$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
 const API_URL = `${BASE}/api/products/`;
+const BRANDS_URL = `${BASE}/api/brands/`;
+const CATEGORIES_URL = `${BASE}/api/categories/`;
 const PH = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300";
-
-const CATEGORIES = [
-  { id: 1, name: "Electronics - ID 1 - Mobiles, Laptops, TV, Headphones", slug: "electronics" },
-  { id: 2, name: "Fashion - ID 2 - Jeans, T-Shirts, Shoes, Bags", slug: "fashion" },
-  { id: 3, name: "Home & Kitchen - ID 3 - Table, Bedsheet, Knife, Cooker", slug: "home-kitchen" },
-  { id: 4, name: "Beauty - ID 4 - Lipstick, Shampoo, Perfume", slug: "beauty" },
-];
-
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "", image: null });
+  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: "", brand: "", image: null });
   const [preview, setPreview] = useState("");
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
-
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -31,9 +25,28 @@ export default function AdminProducts() {
       setProducts([]);
     } finally { setLoading(false); }
   };
-
-  useEffect(() => { fetchProducts(); }, []);
-
+  const fetchBrandsAndCategories = async () => {
+    try {
+      const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const [brandsRes, categoriesRes] = await Promise.all([
+        fetch(BRANDS_URL, { headers }),
+        fetch(CATEGORIES_URL, { headers }),
+      ]);
+      const brandsData = await brandsRes.json();
+      const categoriesData = await categoriesRes.json();
+      setBrands(brandsData.results || brandsData.brands || brandsData || []);
+      setCategories(categoriesData.results || categoriesData.categories || categoriesData || []);
+    } catch (err) {
+      console.error("BRAND/CATEGORY FETCH ERROR:", err);
+      setBrands([]);
+      setCategories([]);
+    }
+  };
+  useEffect(() => {
+    fetchProducts();
+    fetchBrandsAndCategories();
+  }, []);
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "image" && files && files[0]) {
@@ -43,7 +56,6 @@ export default function AdminProducts() {
       setForm({ ...form, [name]: value });
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     setAdding(true);
@@ -72,8 +84,10 @@ export default function AdminProducts() {
         throw new Error(typeof err === "object" ? JSON.stringify(err) : String(err));
       }
       const data = await res.json();
-      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Category ID ${form.category} - Will show in /category/${CATEGORIES.find(c => c.id === Number(form.category))?.slug} DISTINCT!` });
-      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "", image: null });
+      const selectedCategory = categories.find(c => c.id === Number(form.category));
+      const selectedBrand = brands.find(b => b.id === Number(form.brand));
+      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category}` });
+      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: "", brand: "", image: null });
       setPreview("");
       setShowAdd(false);
       fetchProducts();
@@ -81,18 +95,16 @@ export default function AdminProducts() {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAdding(false); }
   };
-
   const handleDelete = async (id) => {
     if (!confirm("Delete product ID " + id + "?")) return;
     try {
-      const token = localStorage.getItem("access") || localStorage.getItem("token") || "";
+      const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || "";
       const res = await fetch(`${API_URL}${id}/`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Delete failed");
       setMsg({ type: "success", text: `Deleted ID ${id}` });
       fetchProducts();
     } catch (err) { setMsg({ type: "error", text: err.message }); }
   };
-
   return (
     <div className="min-h-screen bg-[#EAEDED] p-4">
       <div className="max-w-[1200px] mx-auto">
@@ -113,7 +125,7 @@ export default function AdminProducts() {
               <h2 className="font-bold text-[16px] mb-3">➕ Admin - Add Product - DISTINCT Category Logic</h2>
               <form onSubmit={handleAdd} className="space-y-3">
                 <div>
-                  <label className="text-[12px] font-bold">Product Name * - For Mobiles include word Mobile/Phone</label>
+                  <label className="text-[12px] font-bold">Product Name *</label>
                   <input name="name" value={form.name} onChange={handleChange} required placeholder="e.g. Samsung Galaxy S24 Ultra Mobile - 512GB - For /mobiles DISTINCT" className="w-full mt-1 border border-[#888] rounded-lg px-3 h-10 text-[13px] outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -143,20 +155,22 @@ export default function AdminProducts() {
                   </div>
                   <div>
                     <label className="text-[12px] font-bold">Brand *</label>
-                    <input name="brand" type="number" value={form.brand} onChange={handleChange} required placeholder="Enter existing ASUS Brand ID" className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
+                    <select name="brand" value={form.brand} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                      <option value="">Select Brand</option>
+                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div>
-                  <label className="text-[12px] font-bold">Category * - DISTINCT Logic</label>
-                  <select name="category" value={form.category} onChange={handleChange} className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <label className="text-[12px] font-bold">Category *</label>
+                  <select name="category" value={form.category} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                    <option value="">Select Category</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <div className="bg-[#FFF3CD] border border-[#FFE69C] p-2 rounded mt-2 text-[11px]">
                     <p className="font-bold">📌 Admin - Category Mapping:</p>
-                    <p>ID 1 = Electronics + Mobiles - Name me Mobile/Phone likho toh /mobiles me DISTINCT ayega</p>
-                    <p>ID 2 = Fashion - /category/fashion me DISTINCT</p>
-                    <p>ID 3 = Home & Kitchen - /category/home-kitchen me DISTINCT</p>
-                    <p>ID 4 = Beauty - /category/beauty me DISTINCT</p>
+                    <p>Select Laptop for laptops and Mobile Phones for phones.</p>
+                    <p>Database IDs are handled automatically.</p>
                   </div>
                 </div>
                 <div>
@@ -168,7 +182,7 @@ export default function AdminProducts() {
                   <input name="image" type="file" accept="image/*" onChange={handleChange} className="w-full mt-1 border rounded-lg px-3 py-2 text-[12px]" />
                   {preview && <img src={preview} alt="preview" className="mt-2 h-[100px] object-contain bg-[#f7fafa] border rounded" />}
                 </div>
-                <button disabled={adding} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding..." : "Add Product as Admin - DISTINCT"}</button>
+                <button disabled={adding || !brands.length || !categories.length} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding..." : "Add Product as Admin - DISTINCT"}</button>
               </form>
             </div>
           )}
@@ -200,12 +214,10 @@ export default function AdminProducts() {
         <div className="mt-4 bg-white border rounded-lg p-3 text-[11px]">
           <p className="font-bold">🎯 Admin - How to Add DISTINCT Products - Steps:</p>
           <p>1. Click + Add Product - Form khulega</p>
-          <p>2. Electronics ke liye: Name: Samsung Galaxy Mobile, Category: ID 1, Price: 129999</p>
-          <p>3. Fashion ke liye: Name: Levis Jeans, Category: ID 2, Price: 3499</p>
-          <p>4. Home ke liye: Name: Wooden Table, Category: ID 3, Price: 8999</p>
-          <p>5. Add karne ke baad: /category/electronics me only ID 1 wale - DISTINCT from Fashion/Home</p>
-          <p>6. /mobiles me only name me Mobile/Phone wale - DISTINCT</p>
-          <p>7. Django Admin alternative: http://127.0.0.1:8000/admin/ - Products - Add</p>
+          <p>2. Select Brand from the dropdown</p>
+          <p>3. Select Laptop, Mobile Phones, Electronics, etc. from the dropdown</p>
+          <p>4. Add product image and other details</p>
+          <p>5. Add Product - Database IDs are handled automatically</p>
         </div>
       </div>
     </div>
