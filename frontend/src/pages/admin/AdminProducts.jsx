@@ -68,7 +68,8 @@ export default function AdminProducts() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || err.message || JSON.stringify(err) || `HTTP ${res.status}`);
+        console.error("PRODUCT CREATE ERROR:", err);
+        throw new Error(typeof err === "object" ? JSON.stringify(err) : String(err));
       }
 
       const data = await res.json();
