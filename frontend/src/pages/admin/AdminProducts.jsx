@@ -49,7 +49,7 @@ export default function AdminProducts() {
     setAdding(true);
     setMsg({ type: "", text: "" });
     try {
-      const token = localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
+      const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
       const fd = new FormData();
       fd.append("name", form.name);
       fd.append("description", form.description || `${form.name} - Admin added - Prime delivery`);

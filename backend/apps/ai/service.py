@@ -39,7 +39,7 @@ Answer in 2-3 lines with price in Rs. If no relevant product, say "Aapko kya cha
 
     try:
         response = client.models.generate_content(
-            model="gemini-3.5-flash",  # FIXED: Ye model exist karta hai ✅
+            model="gemini-3.5-flash",
             contents=prompt
         )
         # SECURITY: Response bhi limit karo
@@ -47,11 +47,23 @@ Answer in 2-3 lines with price in Rs. If no relevant product, say "Aapko kya cha
         return text
 
     except Exception as e:
-        logger.exception("GEMINI ERROR")
-        # SECURITY: User ko pura error mat dikhao - hacker info le lega
-        if settings.DEBUG:
-            return f"AI Error: {str(e)[:200]}"
-        return "AI is busy, please try after 1 minute! 🤖"
+        logger.exception("GEMINI PRIMARY MODEL ERROR")
+
+    try:
+            response = client.models.generate_content(
+                model="gemini-3.5-flash-lite",
+                contents=prompt
+            )
+            # SECURITY: Response bhi limit karo
+            text = response.text[:1000] if response.text else "Sorry, try again!"
+            return text
+
+    except Exception as fallback_error:
+            logger.exception("GEMINI FALLBACK MODEL ERROR")
+            # SECURITY: User ko pura error mat dikhao - hacker info le lega
+            if settings.DEBUG:
+                return f"AI Error: {str(fallback_error)[:200]}"
+            return "AI is temporarily busy. Please try again shortly! 🤖"
 
 def get_products_context():
     """Products ka context banao - SQL injection safe"""
