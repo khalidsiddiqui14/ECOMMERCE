@@ -47,7 +47,7 @@ Answer in 2-3 lines with price in Rs. If no relevant product, say "Aapko kya cha
         return text
 
     except Exception as e:
-        logger.error(f"GEMINI ERROR: {e}")
+        logger.exception("GEMINI ERROR")
         # SECURITY: User ko pura error mat dikhao - hacker info le lega
         if settings.DEBUG:
             return f"AI Error: {str(e)[:200]}"
