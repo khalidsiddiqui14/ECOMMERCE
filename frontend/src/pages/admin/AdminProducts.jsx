@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
-const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*\/?$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
 const API_URL = `${BASE}/api/products/`;
 const PH = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300";
 
@@ -16,7 +16,7 @@ export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "ShopZone", image: null });
+  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "", image: null });
   const [preview, setPreview] = useState("");
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
@@ -52,6 +52,8 @@ export default function AdminProducts() {
       const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
       const fd = new FormData();
       fd.append("name", form.name);
+      fd.append("slug", form.slug);
+      fd.append("sku", form.sku);
       fd.append("description", form.description || `${form.name} - Admin added - Prime delivery`);
       fd.append("price", form.price);
       if (form.original_price) fd.append("original_price", form.original_price);
@@ -59,22 +61,19 @@ export default function AdminProducts() {
       fd.append("category", form.category);
       fd.append("brand", form.brand);
       if (form.image) fd.append("image", form.image);
-
       const res = await fetch(API_URL, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error("PRODUCT CREATE ERROR:", err);
         throw new Error(typeof err === "object" ? JSON.stringify(err) : String(err));
       }
-
       const data = await res.json();
       setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Category ID ${form.category} - Will show in /category/${CATEGORIES.find(c => c.id === Number(form.category))?.slug} DISTINCT!` });
-      setForm({ name: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "ShopZone", image: null });
+      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: 1, brand: "", image: null });
       setPreview("");
       setShowAdd(false);
       fetchProducts();
@@ -107,10 +106,8 @@ export default function AdminProducts() {
             <Link to="/admin" className="bg-white text-black px-4 py-2 rounded-lg text-[12px] border">Back to Admin</Link>
           </div>
         </div>
-
         <div className="bg-white p-4 border border-t-0 rounded-b-lg">
           {msg.text && <div className={`${msg.type === "success" ? "bg-[#E8F6EF] border-[#A4D4AE] text-[#067D62]" : "bg-[#FFF6F6] border-[#CC0C39]/30 text-[#CC0C39]"} border p-3 rounded-lg text-[12px] mb-4`}>{msg.text}</div>}
-
           {showAdd && (
             <div className="bg-[#f7fafa] border-2 border-[#FFD814] rounded-lg p-4 mb-6">
               <h2 className="font-bold text-[16px] mb-3">➕ Admin - Add Product - DISTINCT Category Logic</h2>
@@ -118,6 +115,16 @@ export default function AdminProducts() {
                 <div>
                   <label className="text-[12px] font-bold">Product Name * - For Mobiles include word Mobile/Phone</label>
                   <input name="name" value={form.name} onChange={handleChange} required placeholder="e.g. Samsung Galaxy S24 Ultra Mobile - 512GB - For /mobiles DISTINCT" className="w-full mt-1 border border-[#888] rounded-lg px-3 h-10 text-[13px] outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[12px] font-bold">Slug *</label>
+                    <input name="slug" value={form.slug} onChange={handleChange} required placeholder="asus-tuf-gaming-a15-fa506ncg-hn192ws" className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-bold">SKU *</label>
+                    <input name="sku" value={form.sku} onChange={handleChange} required placeholder="ASUS-TUF-A15-FA506NCG-HN192WS" className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -135,8 +142,8 @@ export default function AdminProducts() {
                     <input name="stock" type="number" value={form.stock} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
                   </div>
                   <div>
-                    <label className="text-[12px] font-bold">Brand</label>
-                    <input name="brand" value={form.brand} onChange={handleChange} placeholder="Samsung, Nike" className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
+                    <label className="text-[12px] font-bold">Brand *</label>
+                    <input name="brand" type="number" value={form.brand} onChange={handleChange} required placeholder="Enter existing ASUS Brand ID" className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
                   </div>
                 </div>
                 <div>
@@ -165,7 +172,6 @@ export default function AdminProducts() {
               </form>
             </div>
           )}
-
           {loading ? (
             <div className="grid grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[200px] bg-gray-100 animate-pulse rounded" />)}</div>
           ) : (
@@ -191,7 +197,6 @@ export default function AdminProducts() {
             </>
           )}
         </div>
-
         <div className="mt-4 bg-white border rounded-lg p-3 text-[11px]">
           <p className="font-bold">🎯 Admin - How to Add DISTINCT Products - Steps:</p>
           <p>1. Click + Add Product - Form khulega</p>
