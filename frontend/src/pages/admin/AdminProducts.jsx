@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+
 const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
 const API_URL = `${BASE}/api/products/`;
 const BRANDS_URL = `${BASE}/api/brands/`;
 const CATEGORIES_URL = `${BASE}/api/categories/`;
 const PH = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300";
+
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -15,6 +17,13 @@ export default function AdminProducts() {
   const [preview, setPreview] = useState("");
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
+  const [showAddBrand, setShowAddBrand] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newBrand, setNewBrand] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [addingBrand, setAddingBrand] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -25,6 +34,7 @@ export default function AdminProducts() {
       setProducts([]);
     } finally { setLoading(false); }
   };
+
   const fetchBrandsAndCategories = async () => {
     try {
       const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
@@ -43,10 +53,12 @@ export default function AdminProducts() {
       setCategories([]);
     }
   };
+
   useEffect(() => {
     fetchProducts();
     fetchBrandsAndCategories();
   }, []);
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "image" && files && files[0]) {
@@ -56,6 +68,62 @@ export default function AdminProducts() {
       setForm({ ...form, [name]: value });
     }
   };
+
+  const handleAddBrand = async () => {
+    const name = newBrand.trim();
+    if (!name) return setMsg({ type: "error", text: "❌ Enter brand name." });
+    setAddingBrand(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
+      const res = await fetch(BRANDS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.name?.[0] || JSON.stringify(data));
+      setBrands(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm(prev => ({ ...prev, brand: data.id }));
+      setNewBrand("");
+      setShowAddBrand(false);
+      setMsg({ type: "success", text: `✅ Brand added: ${data.name}` });
+    } catch (err) {
+      setMsg({ type: "error", text: `❌ ${err.message}` });
+    } finally { setAddingBrand(false); }
+  };
+
+  const handleAddCategory = async () => {
+    const name = newCategory.trim();
+    if (!name) return setMsg({ type: "error", text: "❌ Enter category name." });
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    setAddingCategory(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
+      const res = await fetch(CATEGORIES_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ name, slug, description: "" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.name?.[0] || data.slug?.[0] || JSON.stringify(data));
+      setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm(prev => ({ ...prev, category: data.id }));
+      setNewCategory("");
+      setShowAddCategory(false);
+      setMsg({ type: "success", text: `✅ Category added: ${data.name}` });
+    } catch (err) {
+      setMsg({ type: "error", text: `❌ ${err.message}` });
+    } finally { setAddingCategory(false); }
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     setAdding(true);
@@ -95,6 +163,7 @@ export default function AdminProducts() {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAdding(false); }
   };
+
   const handleDelete = async (id) => {
     if (!confirm("Delete product ID " + id + "?")) return;
     try {
@@ -105,6 +174,7 @@ export default function AdminProducts() {
       fetchProducts();
     } catch (err) { setMsg({ type: "error", text: err.message }); }
   };
+
   return (
     <div className="min-h-screen bg-[#EAEDED] p-4">
       <div className="max-w-[1200px] mx-auto">
@@ -155,18 +225,36 @@ export default function AdminProducts() {
                   </div>
                   <div>
                     <label className="text-[12px] font-bold">Brand *</label>
-                    <select name="brand" value={form.brand} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
-                      <option value="">Select Brand</option>
-                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    <div className="flex gap-2 mt-1">
+                      <select name="brand" value={form.brand} onChange={handleChange} required className="flex-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                        <option value="">Select Brand</option>
+                        {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setShowAddBrand(!showAddBrand)} className="px-3 h-10 bg-[#232F3E] text-white rounded-lg text-[12px] font-bold">+ Add</button>
+                    </div>
+                    {showAddBrand && (
+                      <div className="flex gap-2 mt-2">
+                        <input value={newBrand} onChange={e => setNewBrand(e.target.value)} placeholder="e.g. ASUS" className="flex-1 border rounded-lg px-3 h-9 text-[12px]" />
+                        <button type="button" onClick={handleAddBrand} disabled={addingBrand} className="px-3 h-9 bg-[#FFD814] border border-[#FCD200] rounded-lg text-[11px] font-bold">{addingBrand ? "Adding..." : "Add Brand"}</button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label className="text-[12px] font-bold">Category *</label>
-                  <select name="category" value={form.category} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
-                    <option value="">Select Category</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div className="flex gap-2 mt-1">
+                    <select name="category" value={form.category} onChange={handleChange} required className="flex-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                      <option value="">Select Category</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="px-3 h-10 bg-[#232F3E] text-white rounded-lg text-[12px] font-bold">+ Add</button>
+                  </div>
+                  {showAddCategory && (
+                    <div className="flex gap-2 mt-2">
+                      <input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="e.g. Laptop" className="flex-1 border rounded-lg px-3 h-9 text-[12px]" />
+                      <button type="button" onClick={handleAddCategory} disabled={addingCategory} className="px-3 h-9 bg-[#FFD814] border border-[#FCD200] rounded-lg text-[11px] font-bold">{addingCategory ? "Adding..." : "Add Category"}</button>
+                    </div>
+                  )}
                   <div className="bg-[#FFF3CD] border border-[#FFE69C] p-2 rounded mt-2 text-[11px]">
                     <p className="font-bold">📌 Admin - Category Mapping:</p>
                     <p>Select Laptop for laptops and Mobile Phones for phones.</p>
@@ -182,7 +270,7 @@ export default function AdminProducts() {
                   <input name="image" type="file" accept="image/*" onChange={handleChange} className="w-full mt-1 border rounded-lg px-3 py-2 text-[12px]" />
                   {preview && <img src={preview} alt="preview" className="mt-2 h-[100px] object-contain bg-[#f7fafa] border rounded" />}
                 </div>
-                <button disabled={adding || !brands.length || !categories.length} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding..." : "Add Product as Admin - DISTINCT"}</button>
+                <button disabled={adding} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding..." : "Add Product as Admin - DISTINCT"}</button>
               </form>
             </div>
           )}
@@ -214,8 +302,8 @@ export default function AdminProducts() {
         <div className="mt-4 bg-white border rounded-lg p-3 text-[11px]">
           <p className="font-bold">🎯 Admin - How to Add DISTINCT Products - Steps:</p>
           <p>1. Click + Add Product - Form khulega</p>
-          <p>2. Select Brand from the dropdown</p>
-          <p>3. Select Laptop, Mobile Phones, Electronics, etc. from the dropdown</p>
+          <p>2. Select Brand from the dropdown or click + Add to create a new brand</p>
+          <p>3. Select Category from the dropdown or click + Add to create a new category</p>
           <p>4. Add product image and other details</p>
           <p>5. Add Product - Database IDs are handled automatically</p>
         </div>
