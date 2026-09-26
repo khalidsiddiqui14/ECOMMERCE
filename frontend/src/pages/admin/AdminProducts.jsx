@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import { Link } from "react-router-dom";
 
 const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*$/, "") || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -13,7 +14,7 @@ export default function AdminProducts() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: "", brand: "", image: null });
+  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", image: null });
   const [preview, setPreview] = useState("");
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
@@ -33,6 +34,7 @@ export default function AdminProducts() {
     } catch {
       setProducts([]);
     } finally { setLoading(false); }
+
   };
 
   const fetchBrandsAndCategories = async () => {
@@ -52,6 +54,7 @@ export default function AdminProducts() {
       setBrands([]);
       setCategories([]);
     }
+
   };
 
   useEffect(() => {
@@ -94,6 +97,7 @@ export default function AdminProducts() {
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAddingBrand(false); }
+
   };
 
   const handleAddCategory = async () => {
@@ -122,6 +126,7 @@ export default function AdminProducts() {
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAddingCategory(false); }
+
   };
 
   const handleAdd = async (e) => {
@@ -138,6 +143,7 @@ export default function AdminProducts() {
       fd.append("price", form.price);
       if (form.original_price) fd.append("original_price", form.original_price);
       fd.append("stock", form.stock);
+      fd.append("store", form.store);
       fd.append("category", form.category);
       fd.append("brand", form.brand);
       if (form.image) fd.append("image", form.image);
@@ -155,13 +161,14 @@ export default function AdminProducts() {
       const selectedCategory = categories.find(c => c.id === Number(form.category));
       const selectedBrand = brands.find(b => b.id === Number(form.brand));
       setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category}` });
-      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, category: "", brand: "", image: null });
+      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", image: null });
       setPreview("");
       setShowAdd(false);
       fetchProducts();
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAdding(false); }
+
   };
 
   const handleDelete = async (id) => {
@@ -173,6 +180,7 @@ export default function AdminProducts() {
       setMsg({ type: "success", text: `Deleted ID ${id}` });
       fetchProducts();
     } catch (err) { setMsg({ type: "error", text: err.message }); }
+
   };
 
   return (
@@ -224,6 +232,14 @@ export default function AdminProducts() {
                     <input name="stock" type="number" value={form.stock} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px]" />
                   </div>
                   <div>
+                    <label className="text-[12px] font-bold">Store *</label>
+                    <select name="store" value={form.store} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                      <option value="1">Khalid Store</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
                     <label className="text-[12px] font-bold">Brand *</label>
                     <div className="flex gap-2 mt-1">
                       <select name="brand" value={form.brand} onChange={handleChange} required className="flex-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
@@ -239,26 +255,26 @@ export default function AdminProducts() {
                       </div>
                     )}
                   </div>
-                </div>
-                <div>
-                  <label className="text-[12px] font-bold">Category *</label>
-                  <div className="flex gap-2 mt-1">
-                    <select name="category" value={form.category} onChange={handleChange} required className="flex-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
-                      <option value="">Select Category</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="px-3 h-10 bg-[#232F3E] text-white rounded-lg text-[12px] font-bold">+ Add</button>
-                  </div>
-                  {showAddCategory && (
-                    <div className="flex gap-2 mt-2">
-                      <input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="e.g. Laptop" className="flex-1 border rounded-lg px-3 h-9 text-[12px]" />
-                      <button type="button" onClick={handleAddCategory} disabled={addingCategory} className="px-3 h-9 bg-[#FFD814] border border-[#FCD200] rounded-lg text-[11px] font-bold">{addingCategory ? "Adding..." : "Add Category"}</button>
+                  <div>
+                    <label className="text-[12px] font-bold">Category *</label>
+                    <div className="flex gap-2 mt-1">
+                      <select name="category" value={form.category} onChange={handleChange} required className="flex-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
+                        <option value="">Select Category</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="px-3 h-10 bg-[#232F3E] text-white rounded-lg text-[12px] font-bold">+ Add</button>
                     </div>
-                  )}
-                  <div className="bg-[#FFF3CD] border border-[#FFE69C] p-2 rounded mt-2 text-[11px]">
-                    <p className="font-bold">📌 Admin - Category Mapping:</p>
-                    <p>Select Laptop for laptops and Mobile Phones for phones.</p>
-                    <p>Database IDs are handled automatically.</p>
+                    {showAddCategory && (
+                      <div className="flex gap-2 mt-2">
+                        <input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="e.g. Laptop" className="flex-1 border rounded-lg px-3 h-9 text-[12px]" />
+                        <button type="button" onClick={handleAddCategory} disabled={addingCategory} className="px-3 h-9 bg-[#FFD814] border border-[#FCD200] rounded-lg text-[11px] font-bold">{addingCategory ? "Adding..." : "Add Category"}</button>
+                      </div>
+                    )}
+                    <div className="bg-[#FFF3CD] border border-[#FFE69C] p-2 rounded mt-2 text-[11px]">
+                      <p className="font-bold">📌 Admin - Category Mapping:</p>
+                      <p>Select Laptop for laptops and Mobile Phones for phones.</p>
+                      <p>Database IDs are handled automatically.</p>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -302,10 +318,11 @@ export default function AdminProducts() {
         <div className="mt-4 bg-white border rounded-lg p-3 text-[11px]">
           <p className="font-bold">🎯 Admin - How to Add DISTINCT Products - Steps:</p>
           <p>1. Click + Add Product - Form khulega</p>
-          <p>2. Select Brand from the dropdown or click + Add to create a new brand</p>
-          <p>3. Select Category from the dropdown or click + Add to create a new category</p>
-          <p>4. Add product image and other details</p>
-          <p>5. Add Product - Database IDs are handled automatically</p>
+          <p>2. Select Store from the dropdown</p>
+          <p>3. Select Brand from the dropdown or click + Add to create a new brand</p>
+          <p>4. Select Category from the dropdown or click + Add to create a new category</p>
+          <p>5. Add product image and other details</p>
+          <p>6. Add Product - Database IDs are handled automatically</p>
         </div>
       </div>
     </div>
