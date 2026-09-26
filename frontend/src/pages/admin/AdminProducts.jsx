@@ -14,8 +14,8 @@ export default function AdminProducts() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", image: null });
-  const [preview, setPreview] = useState("");
+  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", images: [] });
+  const [previews, setPreviews] = useState([]);
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [showAddBrand, setShowAddBrand] = useState(false);
@@ -64,9 +64,10 @@ export default function AdminProducts() {
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    if (name === "image" && files && files[0]) {
-      setForm({ ...form, image: files[0] });
-      setPreview(URL.createObjectURL(files[0]));
+    if (name === "images" && files && files.length) {
+      const selectedImages = Array.from(files);
+      setForm({ ...form, images: selectedImages });
+      setPreviews(selectedImages.map(file => URL.createObjectURL(file)));
     } else {
       setForm({ ...form, [name]: value });
     }
@@ -146,7 +147,6 @@ export default function AdminProducts() {
       fd.append("store", form.store);
       fd.append("category", form.category);
       fd.append("brand", form.brand);
-      if (form.image) fd.append("image", form.image);
       const res = await fetch(API_URL, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -158,11 +158,30 @@ export default function AdminProducts() {
         throw new Error(typeof err === "object" ? JSON.stringify(err) : String(err));
       }
       const data = await res.json();
+
+      if (form.images.length) {
+        for (let i = 0; i < form.images.length; i++) {
+          const imageForm = new FormData();
+          imageForm.append("image", form.images[i]);
+          imageForm.append("is_primary", i === 0 ? "true" : "false");
+          const imageRes = await fetch(`${API_URL}${data.id}/images/`, {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: imageForm,
+          });
+          if (!imageRes.ok) {
+            const imageErr = await imageRes.json().catch(() => ({}));
+            console.error("PRODUCT IMAGE UPLOAD ERROR:", imageErr);
+            throw new Error(`Product created, but image ${i + 1} failed: ${typeof imageErr === "object" ? JSON.stringify(imageErr) : String(imageErr)}`);
+          }
+        }
+      }
+
       const selectedCategory = categories.find(c => c.id === Number(form.category));
       const selectedBrand = brands.find(b => b.id === Number(form.brand));
-      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category}` });
-      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", image: null });
-      setPreview("");
+      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category} - Images: ${form.images.length}` });
+      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", images: [] });
+      setPreviews([]);
       setShowAdd(false);
       fetchProducts();
     } catch (err) {
@@ -282,11 +301,21 @@ export default function AdminProducts() {
                   <textarea name="description" value={form.description} onChange={handleChange} rows={2} placeholder="Premium quality - Admin added - Prime delivery" className="w-full mt-1 border rounded-lg px-3 py-2 text-[13px]"></textarea>
                 </div>
                 <div>
-                  <label className="text-[12px] font-bold">Image *</label>
-                  <input name="image" type="file" accept="image/*" onChange={handleChange} className="w-full mt-1 border rounded-lg px-3 py-2 text-[12px]" />
-                  {preview && <img src={preview} alt="preview" className="mt-2 h-[100px] object-contain bg-[#f7fafa] border rounded" />}
+                  <label className="text-[12px] font-bold">Product Images *</label>
+                  <input name="images" type="file" accept="image/*" multiple onChange={handleChange} className="w-full mt-1 border rounded-lg px-3 py-2 text-[12px]" />
+                  {previews.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      {previews.map((src, i) => (
+                        <div key={i} className="relative border rounded bg-[#f7fafa] p-1">
+                          <img src={src} alt={`preview-${i + 1}`} className="h-[100px] w-full object-contain" />
+                          {i === 0 && <span className="absolute top-1 left-1 bg-[#FFD814] text-black px-1 py-0.5 rounded text-[9px] font-bold">PRIMARY</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-[#565959] mt-1">Select multiple images at once. The first image will be the primary product image.</p>
                 </div>
-                <button disabled={adding} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding..." : "Add Product as Admin - DISTINCT"}</button>
+                <button disabled={adding} type="submit" className="w-full h-11 bg-[#FFD814] hover:bg-[#F7CA00] border border-[#FCD200] rounded-lg font-bold text-[14px] disabled:opacity-50">{adding ? "Adding Product & Images..." : "Add Product as Admin - DISTINCT"}</button>
               </form>
             </div>
           )}
@@ -301,9 +330,9 @@ export default function AdminProducts() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {products.map(p => (
                   <div key={p.id} className="border rounded-lg p-2 bg-white">
-                    <img src={p.image ? (String(p.image).startsWith("http") ? p.image : `${BASE}${p.image}`) : PH} alt={p.name} className="h-[100px] w-full object-contain bg-[#f7fafa] rounded" onError={e => e.target.src = PH} />
+                    <img src={p.images?.[0]?.image ? (String(p.images[0].image).startsWith("http") ? p.images[0].image : `${BASE}${p.images[0].image}`) : PH} alt={p.name} className="h-[100px] w-full object-contain bg-[#f7fafa] rounded" onError={e => e.target.src = PH} />
                     <p className="text-[12px] mt-1 line-clamp-2 font-medium">{p.name}</p>
-                    <p className="text-[11px] text-[#565959]">ID: {p.id} - Cat: {p.category} - Rs {p.price}</p>
+                    <p className="text-[11px] text-[#565959]">ID: {p.id} - Cat: {p.category} - Rs {p.price} - Images: {p.images?.length || 0}</p>
                     <div className="flex gap-1 mt-2">
                       <Link to={`/product/${p.id}`} className="flex-1 bg-[#f0f2f2] text-center py-1 rounded text-[10px]">View</Link>
                       <button onClick={() => handleDelete(p.id)} className="flex-1 bg-[#FFF6F6] border border-[#CC0C39]/20 text-[#CC0C39] py-1 rounded text-[10px]">Delete</button>
@@ -321,8 +350,8 @@ export default function AdminProducts() {
           <p>2. Select Store from the dropdown</p>
           <p>3. Select Brand from the dropdown or click + Add to create a new brand</p>
           <p>4. Select Category from the dropdown or click + Add to create a new category</p>
-          <p>5. Add product image and other details</p>
-          <p>6. Add Product - Database IDs are handled automatically</p>
+          <p>5. Select multiple product images at once - first image becomes primary</p>
+          <p>6. Add Product - One product will be created with all selected images</p>
         </div>
       </div>
     </div>

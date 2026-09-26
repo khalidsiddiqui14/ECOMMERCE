@@ -51,7 +51,7 @@ export const loginUser = async (email, password) => {
   }
 };
 
-export const registerUser = async (username, email, password, phone) => {
+export const registerUser = async (username, email, password, phone, profileImage = null) => {
   const cleanUsername = String(username || "").trim();
   const cleanEmail = normalizeEmail(email);
   const cleanPhone = normalizePhone(phone);
@@ -63,13 +63,18 @@ export const registerUser = async (username, email, password, phone) => {
   if (String(password).length < 8) throw new Error("Password must be at least 8 characters.");
   if (!cleanPhone) throw new Error("Phone is required.");
   if (!/^\d{10}$/.test(cleanPhone)) throw new Error("Please enter a valid 10-digit phone number.");
+  if (profileImage) {
+    if (profileImage.size > 2 * 1024 * 1024) throw new Error("Profile image size must be less than 2MB.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(profileImage.type)) throw new Error("Only JPG, JPEG, and WEBP images are allowed.");
+  }
   try {
-    const response = await api.post("auth/register/", {
-      username: cleanUsername,
-      email: cleanEmail,
-      password,
-      phone: cleanPhone,
-    });
+    const formData = new FormData();
+    formData.append("username", cleanUsername);
+    formData.append("email", cleanEmail);
+    formData.append("password", password);
+    formData.append("phone", cleanPhone);
+    if (profileImage) formData.append("profile_image", profileImage);
+    const response = await api.post("auth/register/", formData);
     if (response.data?.access_token || response.data?.access) {
       saveAuthData(response.data);
     }

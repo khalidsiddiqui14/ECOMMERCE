@@ -1,15 +1,20 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from django.core.validators import FileExtensionValidator
 
 from .models import User
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     # Validate and hash the user's password
     password = serializers.CharField(
         write_only=True,
         min_length=8,
+    )
+
+    profile_image = serializers.ImageField(
+        required=False,
+        allow_null=True,
     )
 
     class Meta:
@@ -20,6 +25,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             "email",
             "password",
             "phone",
+            "profile_image",
             "role",
         )
         read_only_fields = (
@@ -55,6 +61,25 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         return value
 
+    # Validate the profile image
+    def validate_profile_image(self, value):
+        if value:
+            if value.size > 2 * 1024 * 1024:
+                raise serializers.ValidationError(
+                    "Profile image size must be less than 2MB."
+                )
+
+            if value.content_type not in (
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+            ):
+                raise serializers.ValidationError(
+                    "Only JPG, JPEG, PNG, and WEBP images are allowed."
+                )
+
+        return value
+
     # Create a customer account with a hashed password
     def create(self, validated_data):
         validated_data.pop("role", None)
@@ -68,6 +93,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -99,6 +125,7 @@ class LoginSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -133,6 +160,7 @@ class UserSerializer(serializers.ModelSerializer):
                     "Only jpg, jpeg, png, webp files allowed"
                 )
         return value
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(
