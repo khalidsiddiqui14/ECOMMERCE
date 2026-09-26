@@ -6,15 +6,17 @@ const BASE = (import.meta.env.VITE_API_URL?.replace(/\/api.*$/, "") || "http://1
 const API_URL = `${BASE}/api/products/`;
 const BRANDS_URL = `${BASE}/api/brands/`;
 const CATEGORIES_URL = `${BASE}/api/categories/`;
+const STORES_URL = `${BASE}/api/stores/`;
 const PH = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300";
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", images: [] });
+  const [form, setForm] = useState({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "", category: "", brand: "", images: [] });
   const [previews, setPreviews] = useState([]);
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
@@ -34,27 +36,33 @@ export default function AdminProducts() {
     } catch {
       setProducts([]);
     } finally { setLoading(false); }
-
   };
 
   const fetchBrandsAndCategories = async () => {
     try {
       const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const [brandsRes, categoriesRes] = await Promise.all([
+      const [brandsRes, categoriesRes, storesRes] = await Promise.all([
         fetch(BRANDS_URL, { headers }),
         fetch(CATEGORIES_URL, { headers }),
+        fetch(STORES_URL, { headers }),
       ]);
       const brandsData = await brandsRes.json();
       const categoriesData = await categoriesRes.json();
+      const storesData = await storesRes.json();
       setBrands(brandsData.results || brandsData.brands || brandsData || []);
       setCategories(categoriesData.results || categoriesData.categories || categoriesData || []);
+      const loadedStores = storesData.results || storesData.stores || storesData || [];
+      setStores(loadedStores);
+      if (loadedStores.length > 0) {
+        setForm(prev => ({ ...prev, store: prev.store || String(loadedStores[0].id) }));
+      }
     } catch (err) {
-      console.error("BRAND/CATEGORY FETCH ERROR:", err);
+      console.error("BRAND/CATEGORY/STORE FETCH ERROR:", err);
       setBrands([]);
       setCategories([]);
+      setStores([]);
     }
-
   };
 
   useEffect(() => {
@@ -98,7 +106,6 @@ export default function AdminProducts() {
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAddingBrand(false); }
-
   };
 
   const handleAddCategory = async () => {
@@ -127,7 +134,6 @@ export default function AdminProducts() {
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAddingCategory(false); }
-
   };
 
   const handleAdd = async (e) => {
@@ -136,6 +142,9 @@ export default function AdminProducts() {
     setMsg({ type: "", text: "" });
     try {
       const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("token") || localStorage.getItem("shopzone_token") || localStorage.getItem("admin_token");
+      if (!form.store) throw new Error("Please select a Store.");
+      if (!form.category) throw new Error("Please select a Category.");
+      if (!form.brand) throw new Error("Please select a Brand.");
       const fd = new FormData();
       fd.append("name", form.name);
       fd.append("slug", form.slug);
@@ -158,7 +167,6 @@ export default function AdminProducts() {
         throw new Error(typeof err === "object" ? JSON.stringify(err) : String(err));
       }
       const data = await res.json();
-
       if (form.images.length) {
         for (let i = 0; i < form.images.length; i++) {
           const imageForm = new FormData();
@@ -176,18 +184,17 @@ export default function AdminProducts() {
           }
         }
       }
-
+      const selectedStore = stores.find(s => s.id === Number(form.store));
       const selectedCategory = categories.find(c => c.id === Number(form.category));
       const selectedBrand = brands.find(b => b.id === Number(form.brand));
-      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category} - Images: ${form.images.length}` });
-      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: "1", category: "", brand: "", images: [] });
+      setMsg({ type: "success", text: `✅ Admin - Product Added! ID: ${data.id} - ${data.name} - Store: ${selectedStore?.name || form.store} - Brand: ${selectedBrand?.name || form.brand} - Category: ${selectedCategory?.name || form.category} - Images: ${form.images.length}` });
+      setForm({ name: "", slug: "", sku: "", description: "", price: "", original_price: "", stock: 10, store: stores.length > 0 ? String(stores[0].id) : "", category: "", brand: "", images: [] });
       setPreviews([]);
       setShowAdd(false);
       fetchProducts();
     } catch (err) {
       setMsg({ type: "error", text: `❌ ${err.message}` });
     } finally { setAdding(false); }
-
   };
 
   const handleDelete = async (id) => {
@@ -199,7 +206,6 @@ export default function AdminProducts() {
       setMsg({ type: "success", text: `Deleted ID ${id}` });
       fetchProducts();
     } catch (err) { setMsg({ type: "error", text: err.message }); }
-
   };
 
   return (
@@ -253,7 +259,8 @@ export default function AdminProducts() {
                   <div>
                     <label className="text-[12px] font-bold">Store *</label>
                     <select name="store" value={form.store} onChange={handleChange} required className="w-full mt-1 border rounded-lg px-3 h-10 text-[13px] bg-white">
-                      <option value="1">Khalid Store</option>
+                      <option value="">Select Store</option>
+                      {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
                 </div>
