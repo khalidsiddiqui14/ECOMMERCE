@@ -5,6 +5,7 @@ const INITIAL_STORE = { name:"", slug:"", description:"", email:"", phone:"", ad
 
 function VendorStore() {
   const [store, setStore] = useState(INITIAL_STORE);
+  const [hasStore, setHasStore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -12,17 +13,38 @@ function VendorStore() {
   const [success, setSuccess] = useState("");
 
   const normalizeStore = (data) => ({
-    name: data?.name || "", slug: data?.slug || "", description: data?.description || "",
-    email: data?.email || "", phone: data?.phone || "", address: data?.address || "",
-    city: data?.city || "", state: data?.state || "", country: data?.country || "India", postal_code: data?.postal_code || "",
+    ...INITIAL_STORE,
+    ...(data||{}),
+    name: data?.name || "",
+    slug: data?.slug || "",
+    description: data?.description || "",
+    email: data?.email || "",
+    phone: data?.phone || "",
+    address: data?.address || "",
+    city: data?.city || "",
+    state: data?.state || "",
+    country: data?.country || "India",
+    postal_code: data?.postal_code || "",
   });
 
   const loadStore = useCallback(async (isRefresh=false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError("");
-    try { const data = await getVendorStore(); setStore(normalizeStore(data)); }
-    catch (err) { setError(err.response?.data?.detail || "Store load nahi ho paaya."); }
-    finally { if (isRefresh) setRefreshing(false); else setLoading(false); }
+    setSuccess("");
+    try {
+      const data = await getVendorStore();
+      if (data) {
+        setStore(normalizeStore(data));
+        setHasStore(true);
+      } else {
+        setStore(INITIAL_STORE);
+        setHasStore(false);
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || "Store load nahi ho paaya.");
+    } finally {
+      if (isRefresh) setRefreshing(false); else setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadStore(false); }, [loadStore]);
@@ -30,17 +52,21 @@ function VendorStore() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setStore(prev=>({...prev, [name]: value}));
-    if (error) setError(""); if (success) setSuccess("");
+    if (error) setError("");
+    if (success) setSuccess("");
   };
+
   const slugify = (v) => v.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+
   const handleNameChange = (e) => {
     const name = e.target.value;
     setStore(prev=>{
       const prevAuto = slugify(prev.name);
-      const should =!prev.slug || prev.slug===prevAuto;
-      return {...prev, name, slug: should? slugify(name) : prev.slug };
+      const should = !prev.slug || prev.slug===prevAuto;
+      return {...prev, name, slug: should? slugify(name) : prev.slug};
     });
-    setError(""); setSuccess("");
+    setError("");
+    setSuccess("");
   };
 
   const validateStore = () => {
@@ -63,28 +89,41 @@ function VendorStore() {
 
   const formatApiError = (err) => {
     const data = err.response?.data;
-    if (!data) return err.message || "Store update nahi ho paaya.";
+    if (!data) return err.message || "Store save nahi ho paaya.";
     if (typeof data==="string") return data;
     if (data.detail) return Array.isArray(data.detail)? data.detail.join(", ") : String(data.detail);
     return Object.entries(data).map(([f,m])=>`${f}: ${Array.isArray(m)?m.join(", "):String(m)}`).join(" | ");
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setError(""); setSuccess("");
+    e.preventDefault();
+    setError("");
+    setSuccess("");
     const ve = validateStore();
     if (ve) { setError(ve); return; }
     setSaving(true);
     try {
       const storeData = {
-        name: store.name.trim(), slug: store.slug.trim(), description: store.description.trim(),
-        email: store.email.trim(), phone: store.phone.trim(), address: store.address.trim(),
-        city: store.city.trim(), state: store.state.trim(), country: store.country.trim(), postal_code: store.postal_code.trim(),
+        name: store.name.trim(),
+        slug: store.slug.trim().toLowerCase(),
+        description: store.description.trim(),
+        email: store.email.trim().toLowerCase(),
+        phone: store.phone.trim(),
+        address: store.address.trim(),
+        city: store.city.trim(),
+        state: store.state.trim(),
+        country: store.country.trim(),
+        postal_code: store.postal_code.trim(),
       };
       const data = await updateVendorStore(storeData);
       setStore(normalizeStore(data));
-      setSuccess("Store updated successfully.");
-    } catch (err) { setError(formatApiError(err)); }
-    finally { setSaving(false); }
+      setHasStore(true);
+      setSuccess(hasStore? "Store updated successfully." : "Store created successfully.");
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -106,8 +145,8 @@ function VendorStore() {
             <div className="w-10 h-10 rounded- bg-[#131921] text-white grid place-items-center font-bold">{(store.name||"S")[0].toUpperCase()}</div>
             <div>
               <div className="text- font-bold uppercase text-[#C45500]">SELLER CENTRAL • STORE SETUP</div>
-              <h1 className="text- font-bold">Store Settings 🏪</h1>
-              <p className="text- text-[#565959]">Manage your store info • <strong className="text-[#0F1111]">{store.name || "Unnamed Store"}</strong></p>
+              <h1 className="text- font-bold">{hasStore? "Store Settings 🏪" : "Create Your Store 🏪"}</h1>
+              <p className="text- text-[#565959]">{hasStore? <>Manage your store info • <strong className="text-[#0F1111]">{store.name || "Unnamed Store"}</strong></> : "Create your store once before adding products."}</p>
             </div>
           </div>
           <button onClick={()=>loadStore(true)} disabled={refreshing||saving} className="h-8 px-3 bg-white border border-[#d5d9d9] rounded- text- shadow-sm">{refreshing? "↻ Refreshing..." : "↻ Refresh"}</button>
@@ -169,9 +208,9 @@ function VendorStore() {
             </div>
 
             <div className="flex justify-between items-center p-3 bg-[#f0f2f2] border-t border-[#d5d9d9]">
-              <span className="text- text-[#565959]">🏪 Amazon tip: Good store name + detailed desc builds trust.</span>
+              <span className="text- text-[#565959]">🏪 {hasStore? "Update your store information." : "Create your store before adding products."}</span>
               <button type="submit" disabled={saving} className="h-8 px-5 bg-[#FFD814] border border-[#FCD200] rounded- text- font-bold shadow-sm disabled:opacity-50">
-                {saving? "Saving..." : "💾 Save Store"}
+                {saving? "Saving..." : hasStore? "💾 Update Store" : "🏪 Create Store"}
               </button>
             </div>
           </form>

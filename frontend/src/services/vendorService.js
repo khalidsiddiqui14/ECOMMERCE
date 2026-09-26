@@ -66,14 +66,10 @@ export const getVendorStore = async () => {
   try {
     const response = await api.get("stores/me/");
     return response.data;
-  } catch {
-    try {
-      const res = await api.get("stores/my-store/");
-      return res.data;
-    } catch (err) {
-      console.warn("getVendorStore failed", err?.message);
-      return null;
-    }
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    console.warn("getVendorStore failed", err?.message);
+    throw err;
   }
 };
 
@@ -86,15 +82,19 @@ export const updateVendorStore = async (storeData) => {
     });
     return response.data;
   } catch (err) {
+    if (err.response?.status !== 404) {
+      console.error("updateVendorStore error", err?.response?.data || err?.message);
+      throw err;
+    }
     try {
       const isFormData = storeData instanceof FormData;
-      const res = await api.post("stores/me/", storeData, {
+      const response = await api.post("stores/", storeData, {
         headers: isFormData? { "Content-Type": "multipart/form-data" } : {},
       });
-      return res.data;
-    } catch (e) {
-      console.error("updateVendorStore error", err?.message);
-      throw err;
+      return response.data;
+    } catch (createErr) {
+      console.error("createVendorStore error", createErr?.response?.data || createErr?.message);
+      throw createErr;
     }
   }
 };
