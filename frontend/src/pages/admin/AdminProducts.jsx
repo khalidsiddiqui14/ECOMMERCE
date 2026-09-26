@@ -32,7 +32,8 @@ export default function AdminProducts() {
     try {
       const r = await fetch(API_URL);
       const d = await r.json();
-      setProducts(d.results || d.products || []);
+      const loadedProducts = Array.isArray(d.results) ? d.results : Array.isArray(d.products) ? d.products : Array.isArray(d) ? d : [];
+      setProducts(loadedProducts);
     } catch {
       setProducts([]);
     } finally { setLoading(false); }
@@ -47,13 +48,20 @@ export default function AdminProducts() {
         fetch(CATEGORIES_URL, { headers }),
         fetch(STORES_URL, { headers }),
       ]);
-      const brandsData = await brandsRes.json();
-      const categoriesData = await categoriesRes.json();
-      const storesData = await storesRes.json();
-      setBrands(brandsData.results || brandsData.brands || brandsData || []);
-      setCategories(categoriesData.results || categoriesData.categories || categoriesData || []);
-      const loadedStores = storesData.results || storesData.stores || storesData || [];
+      const brandsData = await brandsRes.json().catch(() => ({}));
+      const categoriesData = await categoriesRes.json().catch(() => ({}));
+      const storesData = await storesRes.json().catch(() => ({}));
+      const loadedBrands = Array.isArray(brandsData.results) ? brandsData.results : Array.isArray(brandsData.brands) ? brandsData.brands : Array.isArray(brandsData) ? brandsData : [];
+      const loadedCategories = Array.isArray(categoriesData.results) ? categoriesData.results : Array.isArray(categoriesData.categories) ? categoriesData.categories : Array.isArray(categoriesData) ? categoriesData : [];
+      const loadedStores = Array.isArray(storesData.results) ? storesData.results : Array.isArray(storesData.stores) ? storesData.stores : Array.isArray(storesData) ? storesData : [];
+      setBrands(loadedBrands);
+      setCategories(loadedCategories);
       setStores(loadedStores);
+      if (!storesRes.ok) {
+        console.error("STORE API ERROR:", storesData);
+        setMsg({ type: "error", text: `❌ Store API error: ${storesData.detail || storesData.message || JSON.stringify(storesData)}` });
+        return;
+      }
       if (loadedStores.length > 0) {
         setForm(prev => ({ ...prev, store: prev.store || String(loadedStores[0].id) }));
       }
@@ -62,6 +70,7 @@ export default function AdminProducts() {
       setBrands([]);
       setCategories([]);
       setStores([]);
+      setMsg({ type: "error", text: `❌ ${err.message}` });
     }
   };
 
