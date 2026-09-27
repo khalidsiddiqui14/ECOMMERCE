@@ -1,6 +1,7 @@
 import api from "./api";
 
 const normalizeEmail = (v) => String(v || "").trim().toLowerCase();
+
 const normalizePhone = (v) => String(v || "").replace(/\D/g, "");
 
 const saveAuthData = (data) => {
@@ -51,10 +52,12 @@ export const loginUser = async (email, password) => {
   }
 };
 
-export const registerUser = async (username, email, password, phone, profileImage = null) => {
+export const registerUser = async (username, email, password, phone, profileImage = null, registrationData = {}) => {
   const cleanUsername = String(username || "").trim();
   const cleanEmail = normalizeEmail(email);
   const cleanPhone = normalizePhone(phone);
+  const role = String(registrationData?.role || "CUSTOMER").trim().toUpperCase();
+
   if (!cleanUsername) throw new Error("Username is required.");
   if (cleanUsername.length < 3) throw new Error("Username must be at least 3 characters.");
   if (!cleanEmail) throw new Error("Email is required.");
@@ -63,21 +66,49 @@ export const registerUser = async (username, email, password, phone, profileImag
   if (String(password).length < 8) throw new Error("Password must be at least 8 characters.");
   if (!cleanPhone) throw new Error("Phone is required.");
   if (!/^\d{10}$/.test(cleanPhone)) throw new Error("Please enter a valid 10-digit phone number.");
+  if (!["CUSTOMER", "VENDOR"].includes(role)) throw new Error("Invalid account type.");
   if (profileImage) {
     if (profileImage.size > 2 * 1024 * 1024) throw new Error("Profile image size must be less than 2MB.");
     if (!["image/jpeg", "image/png", "image/webp"].includes(profileImage.type)) throw new Error("Only JPG, JPEG, and WEBP images are allowed.");
   }
+
+  if (role === "VENDOR") {
+    if (!String(registrationData.business_name || "").trim()) throw new Error("Business name is required.");
+    if (!String(registrationData.vendor_phone || "").trim()) throw new Error("Business phone is required.");
+    if (!String(registrationData.business_address || "").trim()) throw new Error("Business address is required.");
+    if (!String(registrationData.business_city || "").trim()) throw new Error("Business city is required.");
+    if (!String(registrationData.business_state || "").trim()) throw new Error("Business state is required.");
+    if (!String(registrationData.business_country || "").trim()) throw new Error("Business country is required.");
+    if (!String(registrationData.business_postal_code || "").trim()) throw new Error("Business postal code is required.");
+  }
+
   try {
     const formData = new FormData();
     formData.append("username", cleanUsername);
     formData.append("email", cleanEmail);
     formData.append("password", password);
     formData.append("phone", cleanPhone);
+    formData.append("role", role);
+
     if (profileImage) formData.append("profile_image", profileImage);
+
+    if (role === "VENDOR") {
+      formData.append("business_name", String(registrationData.business_name || "").trim());
+      formData.append("vendor_phone", normalizePhone(registrationData.vendor_phone));
+      formData.append("gst_number", String(registrationData.gst_number || "").trim());
+      formData.append("business_address", String(registrationData.business_address || "").trim());
+      formData.append("business_city", String(registrationData.business_city || "").trim());
+      formData.append("business_state", String(registrationData.business_state || "").trim());
+      formData.append("business_country", String(registrationData.business_country || "").trim());
+      formData.append("business_postal_code", String(registrationData.business_postal_code || "").trim());
+    }
+
     const response = await api.post("auth/register/", formData);
+
     if (response.data?.access_token || response.data?.access) {
       saveAuthData(response.data);
     }
+
     return response.data;
   } catch (err) {
     console.error("REGISTER API ERROR:", err);
