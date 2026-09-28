@@ -33,12 +33,24 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+const isAuthUrl = (url = "") => {
+  const requestUrl = String(url).toLowerCase();
+  return requestUrl.includes("auth/login") ||
+    requestUrl.includes("auth/register") ||
+    requestUrl.includes("auth/otp") ||
+    requestUrl.includes("auth/google") ||
+    requestUrl.includes("auth/token") ||
+    requestUrl.includes("auth/password");
+};
+
 api.interceptors.request.use((config) => {
   try {
-    const token = getAccessToken();
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
+    config.headers = config.headers || {};
+    if (!isAuthUrl(config.url)) {
+      const token = getAccessToken();
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
     if (config.data && typeof config.data === "object" && !(config.data instanceof FormData)) {
       const str = JSON.stringify(config.data);
@@ -68,9 +80,8 @@ api.interceptors.response.use(
     }
     const status = error.response.status;
     const msg = (error.response.data?.message || error.response.data?.detail || "").toLowerCase();
-    const requestUrl = String(original.url || "").toLowerCase();
-    const isAuthUrl = requestUrl.includes("auth/login") || requestUrl.includes("auth/register") || requestUrl.includes("auth/otp") || requestUrl.includes("auth/google") || requestUrl.includes("auth/token") || requestUrl.includes("auth/password");
-    const isTokenError = status === 401 && !isAuthUrl && (msg.includes("token") || msg.includes("unauthorized") || msg.includes("authentication") || msg.includes("credentials") || msg.includes("expired") || msg.includes("invalid") || msg === "");
+    const authRequest = isAuthUrl(original.url);
+    const isTokenError = status === 401 && !authRequest && (msg.includes("token") || msg.includes("unauthorized") || msg.includes("authentication") || msg.includes("credentials") || msg.includes("expired") || msg.includes("invalid") || msg === "");
     if (isTokenError) {
       if (original._retry) {
         logoutAndRedirect();
@@ -96,7 +107,12 @@ api.interceptors.response.use(
       }
       try {
         const refreshUrl = `${API_BASE.replace(/\/?$/, "/")}auth/token/refresh/`;
-        const res = await axios.post(refreshUrl, { refresh: refreshToken }, { headers: { "Content-Type": "application/json", Accept: "application/json" } });
+        const res = await axios.post(refreshUrl, { refresh: refreshToken }, {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        });
         const newAccess = res.data?.access || res.data?.access_token;
         const newRefresh = res.data?.refresh || res.data?.refresh_token;
         if (!newAccess) throw new Error("No access token");
@@ -138,9 +154,7 @@ api.interceptors.response.use(
 async function logoutAndRedirect() {
   try {
     const refreshToken = localStorage.getItem("refresh_token");
-    if (refreshToken) {
-      api.post("auth/logout/", { refresh: refreshToken }).catch(() => {});
-    }
+    if (refreshToken) api.post("auth/logout/", { refresh: refreshToken }).catch(() => {});
     localStorage.removeItem("access_token");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("token");
