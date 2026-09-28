@@ -10,18 +10,19 @@ from .serializers import StoreSerializer
 
 
 class IsAdminOrVendorStore(BasePermission):
-
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
 
-        if request.method in SAFE_METHODS:
-            return request.user.role in (
-                "ADMIN",
-                "VENDOR",
-            )
+        if request.user.role == "ADMIN":
+            return True
 
-        return request.user.role == "VENDOR"
+        if request.user.role == "VENDOR":
+            return Vendor.objects.filter(
+                user=request.user,
+            ).exists()
+
+        return False
 
 
 class StoreCreateView(generics.ListCreateAPIView):
