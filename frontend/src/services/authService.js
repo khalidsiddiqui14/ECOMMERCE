@@ -1,9 +1,7 @@
 import api from "./api";
 
 const normalizeEmail = (v) => String(v || "").trim().toLowerCase();
-
 const normalizePhone = (v) => String(v || "").replace(/\D/g, "");
-
 const saveAuthData = (data) => {
   try {
     const access = data?.access_token || data?.access || data?.tokens?.access || data?.data?.access_token || data?.token || data?.jwt;
@@ -13,9 +11,7 @@ const saveAuthData = (data) => {
       localStorage.setItem("access_token", access);
       localStorage.setItem("accessToken", access);
     }
-    if (refresh) {
-      localStorage.setItem("refresh_token", refresh);
-    }
+    if (refresh) localStorage.setItem("refresh_token", refresh);
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
       if (user?.role) localStorage.setItem("user_role", user.role);
@@ -31,7 +27,6 @@ const saveAuthData = (data) => {
     return { access: null, refresh: null, user: null, raw: data };
   }
 };
-
 export const loginUser = async (email, password) => {
   const cleanEmail = normalizeEmail(email);
   if (!cleanEmail) throw new Error("Email is required.");
@@ -44,20 +39,16 @@ export const loginUser = async (email, password) => {
     return { ...response.data, _saved: saved };
   } catch (err) {
     const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.response?.data?.email?.[0] || "";
-    if (msg.toLowerCase().includes("no active") || msg.toLowerCase().includes("not found")) {
-      throw new Error("No account found with this email. Please register.");
-    }
+    if (msg.toLowerCase().includes("no active") || msg.toLowerCase().includes("not found")) throw new Error("No account found with this email. Please register.");
     if (err?.response?.status === 401) throw new Error("Incorrect password. Try again or reset password.");
     throw err;
   }
 };
-
 export const registerUser = async (username, email, password, phone, profileImage = null, registrationData = {}) => {
   const cleanUsername = String(username || "").trim();
   const cleanEmail = normalizeEmail(email);
   const cleanPhone = normalizePhone(phone);
   const role = String(registrationData?.role || "CUSTOMER").trim().toUpperCase();
-
   if (!cleanUsername) throw new Error("Username is required.");
   if (cleanUsername.length < 3) throw new Error("Username must be at least 3 characters.");
   if (!cleanEmail) throw new Error("Email is required.");
@@ -71,7 +62,6 @@ export const registerUser = async (username, email, password, phone, profileImag
     if (profileImage.size > 2 * 1024 * 1024) throw new Error("Profile image size must be less than 2MB.");
     if (!["image/jpeg", "image/png", "image/webp"].includes(profileImage.type)) throw new Error("Only JPG, JPEG, and WEBP images are allowed.");
   }
-
   if (role === "VENDOR") {
     if (!String(registrationData.business_name || "").trim()) throw new Error("Business name is required.");
     if (!String(registrationData.vendor_phone || "").trim()) throw new Error("Business phone is required.");
@@ -81,7 +71,6 @@ export const registerUser = async (username, email, password, phone, profileImag
     if (!String(registrationData.business_country || "").trim()) throw new Error("Business country is required.");
     if (!String(registrationData.business_postal_code || "").trim()) throw new Error("Business postal code is required.");
   }
-
   try {
     const formData = new FormData();
     formData.append("username", cleanUsername);
@@ -89,9 +78,7 @@ export const registerUser = async (username, email, password, phone, profileImag
     formData.append("password", password);
     formData.append("phone", cleanPhone);
     formData.append("role", role);
-
     if (profileImage) formData.append("profile_image", profileImage);
-
     if (role === "VENDOR") {
       formData.append("business_name", String(registrationData.business_name || "").trim());
       formData.append("vendor_phone", normalizePhone(registrationData.vendor_phone));
@@ -102,26 +89,18 @@ export const registerUser = async (username, email, password, phone, profileImag
       formData.append("business_country", String(registrationData.business_country || "").trim());
       formData.append("business_postal_code", String(registrationData.business_postal_code || "").trim());
     }
-
     const response = await api.post("auth/register/", formData);
-
-    if (response.data?.access_token || response.data?.access) {
-      saveAuthData(response.data);
-    }
-
+    if (response.data?.access_token || response.data?.access) saveAuthData(response.data);
     return response.data;
   } catch (err) {
     console.error("REGISTER API ERROR:", err);
     throw err;
   }
 };
-
 export const logoutUser = async () => {
   try {
     const refresh = localStorage.getItem("refresh_token");
-    if (refresh) {
-      await api.post("auth/logout/", { refresh }).catch(() => {});
-    }
+    if (refresh) await api.post("auth/logout/", { refresh }).catch(() => {});
   } finally {
     try {
       localStorage.removeItem("access_token");
@@ -144,7 +123,6 @@ export const logoutUser = async () => {
     } catch {}
   }
 };
-
 export const getCurrentUser = async () => {
   try {
     const response = await api.get("auth/profile/");
@@ -159,21 +137,20 @@ export const getCurrentUser = async () => {
     throw err;
   }
 };
-
 export const forgotPassword = async (email) => {
   const cleanEmail = normalizeEmail(email);
   if (!cleanEmail) throw new Error("Email is required.");
-  const response = await api.post("auth/password/forgot/", { email: cleanEmail });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new Error("Please enter a valid email.");
+  const response = await api.post("auth/forgot-password/", { email: cleanEmail });
   return response.data;
 };
-
-export const resetPassword = async (token, password) => {
+export const resetPassword = async (uid, token, newPassword) => {
+  if (!uid) throw new Error("Reset UID is required.");
   if (!token) throw new Error("Reset token is required.");
-  if (!password || String(password).length < 8) throw new Error("Password must be at least 8 characters.");
-  const response = await api.post("auth/password/reset/", { token, password });
+  if (!newPassword || String(newPassword).length < 8) throw new Error("Password must be at least 8 characters.");
+  const response = await api.post("auth/reset-password/", { uid, token, new_password: newPassword });
   return response.data;
 };
-
 export const changePassword = async (oldPassword, newPassword) => {
   if (!oldPassword) throw new Error("Old password is required.");
   if (!newPassword || String(newPassword).length < 8) throw new Error("New password must be at least 8 characters.");
@@ -183,7 +160,6 @@ export const changePassword = async (oldPassword, newPassword) => {
   });
   return response.data;
 };
-
 export const isAuthenticated = () => {
   try {
     const token = localStorage.getItem("access_token") || localStorage.getItem("accessToken") || localStorage.getItem("token");
@@ -200,7 +176,6 @@ export const isAuthenticated = () => {
     return false;
   }
 };
-
 export const getStoredUser = () => {
   try {
     const raw = localStorage.getItem("user");
@@ -209,7 +184,6 @@ export const getStoredUser = () => {
     return null;
   }
 };
-
 export const sendLoginOtp = async (emailOrPhone) => {
   const value = String(emailOrPhone || "").trim();
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -217,24 +191,21 @@ export const sendLoginOtp = async (emailOrPhone) => {
   const res = await api.post("auth/otp/send/", payload);
   return res.data;
 };
-
 export const verifyLoginOtp = async (emailOrPhone, otp) => {
-  if (!otp || String(otp).length !== 6) throw new Error("OTP must be 6 digits");
   const value = String(emailOrPhone || "").trim();
+  if (!otp || String(otp).length !== 6) throw new Error("OTP must be 6 digits");
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const payload = isEmail ? { email: normalizeEmail(value), otp: String(otp) } : { phone: normalizePhone(value), otp: String(otp) };
   const res = await api.post("auth/otp/verify/", payload);
   const saved = saveAuthData(res.data);
   return { ...res.data, _saved: saved };
 };
-
 export const googleLogin = async (idToken) => {
   if (!idToken) throw new Error("Google token required");
   const res = await api.post("auth/google/", { id_token: idToken, token: idToken });
   const saved = saveAuthData(res.data);
   return { ...res.data, _saved: saved };
 };
-
 export default {
   loginUser,
   registerUser,
